@@ -1,7 +1,7 @@
 // Printable design report (browser Print → Save as PDF) + CSV/JSON exports.
 import { db, getDesign, designTitle, today } from '../store.js';
 import { FIELDS, FIELD } from '../fields.js';
-import { evaluate, centerOfMass, sanityChecks, componentMass, SOURCE_LABEL } from '../model.js';
+import { evaluate, centerOfMass, sanityChecks, componentMass, partMassSource, pocketRemoval, SOURCE_LABEL } from '../model.js';
 import { designCalcs, stabilityCalcs, structureCalcs, simulationSource } from '../calcs.js';
 import { explain, sensitivity } from '../explain.js';
 import { TrajectoryView } from '../trajectory.js';
@@ -33,7 +33,8 @@ export function show(el, app, { id }) {
     const v = r.v[f.id];
     const shown = v === undefined || v === '' ? '<span class="muted">Not provided</span>'
       : f.type === 'select' ? esc(f.options.find((o) => o[0] === v)?.[1] || v) : f.type === 'text' ? esc(v) : `${sig(v, 4)} ${esc(f.unit || '')}`;
-    return `<tr><td>${esc(f.label)}</td><td class="num">${shown}</td><td>${badge(v === undefined || v === '' ? 'missing' : r.src[f.id])}</td></tr>`;
+    const note = d.sourceNote?.[f.id] ? `<br><small class="muted">${esc(d.sourceNote[f.id])}</small>` : '';
+    return `<tr><td>${esc(f.label)}</td><td class="num">${shown}</td><td>${badge(v === undefined || v === '' ? 'missing' : r.src[f.id])}${note}</td></tr>`;
   }).join('');
 
   el.innerHTML = `
@@ -68,6 +69,7 @@ export function show(el, app, { id }) {
       </div>` : `<p>The simulation could not run. Missing: ${ev.missing.map((m) => esc(m.label)).join(', ')}.</p>`}
 
       <h2>2. Design inputs</h2>
+      ${d.weather ? `<p class="small">Weather data: NASA POWER (MERRA-2) for ${fmt(d.weather.lat, 2)}, ${fmt(d.weather.lon, 2)}, ${d.weather.mode === 'actual' ? 'on ' + esc(d.weather.date) : 'typical for the week of ' + esc(d.weather.date)} — area average, not measured at the deck.</p>` : ''}
       <table class="list-table report-table"><thead><tr><th>Input</th><th>Value</th><th>Source</th></tr></thead><tbody>${inputRows}</tbody></table>
 
       <h2>3. CAD measurements</h2>
@@ -83,9 +85,10 @@ export function show(el, app, { id }) {
         </tbody></table>` : '<p class="muted">No CAD model analysed for this design.</p>'}
 
       <h2>4. Mass breakdown &amp; centre of mass</h2>
-      ${d.components.length ? `<table class="list-table report-table"><thead><tr><th>Part</th><th>Category</th><th>Mass</th><th>Source</th><th>Material</th><th>From nose</th><th>Notes</th></tr></thead><tbody>
+      ${d.components.length ? `<table class="list-table report-table"><thead><tr><th>Part</th><th>Category</th><th>Mass</th><th>Source</th><th>Pocketing removed</th><th>Material</th><th>From nose</th><th>Notes</th></tr></thead><tbody>
         ${d.components.map((c) => `<tr><td>${esc(c.name)}</td><td>${esc(c.category)}</td><td class="num">${isNum(componentMass(c)) ? `${fmt(componentMass(c), 2)} kg${(c.qty || 1) > 1 ? ` (${c.qty}×)` : ''}` : 'not provided'}</td>
-          <td>${badge(isNum(componentMass(c)) ? c.massSource || 'entered' : 'missing')}</td><td>${esc(c.material)}</td><td class="num">${isNum(c.x) ? fmt(c.x, 2) + ' m' : '–'}</td><td>${esc(c.notes)}</td></tr>`).join('')}
+          <td>${badge(isNum(componentMass(c)) ? partMassSource(c) : 'missing')}</td>
+          <td class="num">${(() => { const p = pocketRemoval(c); return p.none ? '–' : p.ok ? `${fmt(p.mass, 3)} kg each${isNum(c.density) ? ` (ρ = ${c.density} kg/m³)` : ''}` : 'not subtracted: ' + esc(p.reason); })()}</td><td>${esc(c.material)}</td><td class="num">${isNum(c.x) ? fmt(c.x, 2) + ' m' : '–'}</td><td>${esc(c.notes)}</td></tr>`).join('')}
       </tbody></table>` : '<p class="muted">No parts listed.</p>'}
       <p>Centre of mass: ${isNum(com.x) ? `<strong>${fmt(com.x, 2)} m from nose</strong>${isNum(com.y) ? `, ${fmt(com.y, 2)} m above lowest point` : ''} ${badge(com.guessed ? 'estimated' : 'calculated')}` : `cannot be calculated${com.missingX.length ? ` (positions missing for: ${com.missingX.map(esc).join(', ')})` : ''}`}.</p>
 

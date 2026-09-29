@@ -13,10 +13,54 @@ export const SOURCE_LABEL = {
   measured: 'Measured', entered: 'Entered', calculated: 'Calculated', estimated: 'Estimated', missing: 'Not provided',
 };
 
+// ---------------------------------------------------------------------------
+// Pocketing (lightweighting): material removed from a part.
+// Pocket sizes in mm. shape 'rect': a × b × depth; 'round': Ø a × depth. count = how many identical pockets.
+// Removed mass = total pocket volume × the part's material density (entered by the user, never assumed),
+// plus any directly entered removed mass (e.g. weighed offcuts). Applied per item, times quantity.
+// ---------------------------------------------------------------------------
+export function pocketVolume(p) {
+  const n = isNum(p.count) ? p.count : 1;
+  const depth = p.depth / 1000;
+  if (p.shape === 'round') return isNum(p.a) && isNum(p.depth) ? n * Math.PI * (p.a / 2000) ** 2 * depth : NaN;
+  return isNum(p.a) && isNum(p.b) && isNum(p.depth) ? n * (p.a / 1000) * (p.b / 1000) * depth : NaN;
+}
+
+export function pocketRemoval(c) {
+  const pockets = c.pockets || [];
+  const hasManual = isNum(c.removedMass) && c.removedMass > 0;
+  if (!pockets.length && !hasManual) return { none: true, mass: 0, volume: 0 };
+  const vols = pockets.map(pocketVolume);
+  const incomplete = vols.filter((v) => !isNum(v)).length;
+  const volume = vols.filter(isNum).reduce((a, v) => a + v, 0);
+  if (volume > 0 && !isNum(c.density)) return { ok: false, reason: 'material density not entered', volume, mass: hasManual ? c.removedMass : 0, incomplete };
+  const mass = volume * (c.density || 0) + (hasManual ? c.removedMass : 0);
+  return { ok: true, volume, mass, incomplete };
+}
+
+// Mass of one parts-list row including quantity, after pocketing.
 export function componentMass(c) {
   const qty = isNum(c.qty) ? c.qty : 1;
-  return isNum(c.mass) ? c.mass * qty : NaN;
+  if (!isNum(c.mass)) return NaN;
+  const rem = pocketRemoval(c);
+  return Math.max(0, c.mass - (rem.none ? 0 : rem.mass)) * qty;
 }
+
+// Source label of a part's final mass: pocketing turns a weighed/spec mass into a calculated one.
+export function partMassSource(c) {
+  const src = c.massSource || 'entered';
+  const rem = pocketRemoval(c);
+  if (rem.none || rem.ok === false || src === 'estimated') return src;
+  return 'calculated';
+}
+
+// Same design with every pocket removed (for "with vs without pocketing" comparisons).
+export function withoutPocketing(d) {
+  const copy = JSON.parse(JSON.stringify(d));
+  for (const c of copy.components) { c.pockets = []; delete c.removedMass; }
+  return copy;
+}
+export const hasPocketing = (d) => d.components.some((c) => !pocketRemoval(c).none);
 
 // ---------------------------------------------------------------------------
 // resolve(design) -> { v, src, how }
@@ -42,7 +86,7 @@ export function resolve(d) {
   const parts = d.components.filter((c) => isNum(componentMass(c)));
   if (!has('craftMass') && parts.length) {
     const sum = parts.reduce((a, c) => a + componentMass(c), 0);
-    const guessed = parts.some((c) => c.massSource === 'estimated') ? ['estimated'] : [];
+    const guessed = parts.some((c) => c.massSource === 'estimated' || (!pocketRemoval(c).none && c.densitySource === 'estimated')) ? ['estimated'] : [];
     put('craftMass', sum, [], `Sum of ${parts.length} part${parts.length > 1 ? 's' : ''} in the Mass & balance tab.`, guessed);
   }
   if (has('craftMass') && has('pilotMass')) {
@@ -159,6 +203,7 @@ export function applyAssumptions(d, ids) {
     if (!f?.assume) continue;
     d.values[id] = f.assume.value;
     d.source[id] = 'estimated';
+    if (d.sourceNote) delete d.sourceNote[id];
   }
 }
 
@@ -214,6 +259,13 @@ export function sanityChecks(d, r, analysis) {
   const partsSum = d.components.reduce((a, c) => a + (isNum(componentMass(c)) ? componentMass(c) : 0), 0);
   if (isNum(d.values.craftMass) && partsSum > 0 && Math.abs(partsSum - d.values.craftMass) > 0.05 * d.values.craftMass) {
     add('warn', `Craft mass entered (${d.values.craftMass} kg) differs from the sum of parts (${partsSum.toFixed(1)} kg).`, 'craftMass');
+  }
+  for (const c of d.components) {
+    const rem = pocketRemoval(c);
+    if (rem.ok === false) add('warn', `Pockets on "${c.name || 'unnamed part'}" are not subtracted: ${rem.reason}.`);
+    if (rem.incomplete) add('info', `${rem.incomplete} pocket(s) on "${c.name || 'unnamed part'}" are missing a size and are ignored.`);
+    if (!rem.none && c.massSource === 'calculated' && c.massFromCad) add('warn', `"${c.name || 'unnamed part'}" already gets its mass from the CAD volume. If the CAD model is already pocketed, adding pockets here subtracts them twice.`);
+    if (!rem.none && isNum(c.mass) && rem.mass > c.mass) add('error', `Pockets on "${c.name || 'unnamed part'}" remove more mass (${rem.mass.toFixed(2)} kg) than the part has (${c.mass} kg). Check sizes and density.`);
   }
   const noMass = d.components.filter((c) => !isNum(componentMass(c)));
   if (noMass.length) add('info', `${noMass.length} part(s) in Mass & balance have no mass yet: ${noMass.map((c) => c.name || 'unnamed').join(', ')}.`);

@@ -22,9 +22,9 @@ Double-clicking `index.html` won't work, because browsers block JavaScript modul
 |---|---|
 | **Dashboard** | Start a design (Upload CAD / Enter manually), open, **New version** (1 → 1.1 → 1.2), **Duplicate** (→ Design 2), delete, backup/import |
 | Design → **Overview** | Flight estimate, problem checks, "What information do we have?" checklist |
-| Design → **Inputs** | All design inputs, shown as Basic / More details / Advanced, with "What is this?" help and a live estimate |
+| Design → **Inputs** | All design inputs, shown as Basic / More details / Advanced, with "What is this?" help and a live estimate. **Get weather from NASA**: pick the event location and date to pull real wind, temperature and pressure (NASA POWER) |
 | Design → **CAD model** | STL/GLB upload, units and orientation, geometry analysis, part roles (wing, tail, fin), apply measurements |
-| Design → **Mass & balance** | Parts list with masses and positions, mass distribution, centre of mass, side-view diagram, preliminary static-margin check |
+| Design → **Mass & balance** | Parts list with masses and positions, **pocketing / lightweighting** (by hand, or mass from CAD volume × density) with a with-vs-without flight comparison, mass distribution, centre of mass, side-view diagram, preliminary static-margin check |
 | Design → **Simulate** | 3D view, animated flight (play, pause, restart, speed), graphs, results, "What does this mean?" |
 | Design → **What if?** | Sweep one input and see how the outputs change, compare one change, sensitivity chart |
 | Design → **Calculations** | Every equation with its inputs, sources, result and units ("How did you get this?") |

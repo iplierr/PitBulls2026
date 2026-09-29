@@ -226,7 +226,7 @@ function onAnalysisClick(e) {
       d.components.push({ id: uid(), name, category: role === 'wing' ? 'Main wing' : role === 'htail' || role === 'vtail' ? 'Tail' : role === 'body' ? 'Frame' : 'Other',
         mass: null, qty: 1, massSource: 'measured', material: '', dims: `${fmt(p.size.x, 2)} × ${fmt(p.size.z, 2)} × ${fmt(p.size.y, 2)} m`,
         x: +((p.fromNose[0] + p.fromNose[1]) / 2).toFixed(3), y: +((p.height[0] + p.height[1]) / 2).toFixed(3),
-        notes: 'Position = centre of the CAD part\'s bounding box (measured). Mass still needed.', cadPart: p.i });
+        notes: 'Position = centre of the CAD part\'s bounding box (measured). Mass still needed.', cadPart: p.i, cadVolume: p.volume ?? null });
       added++;
     }
     toast(added ? `Added ${added} part(s) to the Mass & balance list. Enter their masses there.` : 'All parts are already in the list.');

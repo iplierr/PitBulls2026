@@ -9,6 +9,7 @@ import * as massTab from './mass-tab.js';
 import * as simTab from './sim-tab.js';
 import * as whatifTab from './whatif-tab.js';
 import * as calcTab from './calc-tab.js';
+import { nasaPanelHTML, bindNasaPanel, refreshNasaPanel } from './nasa-panel.js';
 
 const overviewTab = { render: renderOverview, update: renderOverview };
 const inputsTab = { render: renderInputs, update: updateInputs };
@@ -255,6 +256,8 @@ function renderInputs(panel) {
   const level = db.settings.level || 'basic';
   panel.innerHTML = `
     <div class="inputs-layout">
+      <div>
+      ${nasaPanelHTML(S.d)}
       <div class="panel section">
         <div class="panel-head">
           <h2>Design inputs</h2>
@@ -267,6 +270,7 @@ function renderInputs(panel) {
           Need feet or pounds? Use <strong>⇄ Units</strong> at the top.</p>
         <form id="input-form" novalidate>${groupsHTML('inputs')}</form>
       </div>
+      </div>
       <aside class="panel section sticky-side" id="inputs-side"></aside>
     </div>`;
   const form = panel.querySelector('#input-form');
@@ -277,6 +281,7 @@ function renderInputs(panel) {
     updateInputs(panel, ctx, null);
   }));
   bindMissingBlock(panel.querySelector('#inputs-side'));
+  bindNasaPanel(panel.querySelector('.nasa-panel'), ctx);
   updateInputs(panel, ctx, null);
 }
 
@@ -285,6 +290,7 @@ function updateInputs(panel, _ctx, skipId) {
   if (!form) return;
   const requiredIds = S.ev.missing.flatMap((m) => m.fieldIds.slice(0, 1));
   refreshFields(form, S.d, S.ev.r, { level: db.settings.level || 'basic', requiredIds, skipId });
+  refreshNasaPanel(panel.querySelector('.nasa-panel'), ctx);
   const a = S.ev.analysis;
   const checks = sanityChecks(S.d, S.ev.r, a).filter((c) => c.level !== 'info');
   panel.querySelector('#inputs-side').innerHTML = `

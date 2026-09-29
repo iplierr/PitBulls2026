@@ -6,6 +6,7 @@ import { simulationSource } from '../calcs.js';
 import { getCadFile } from '../idb.js';
 import { esc, fmt, badge } from '../ui.js';
 import { missingBlockHTML, bindMissingBlock } from './design.js';
+import { evaluate, withoutPocketing, hasPocketing } from '../model.js';
 
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 let T = null; // trajectory view (one per render)
@@ -138,6 +139,7 @@ export function update(panel, ctx) {
       <tr><td>Max lift / max drag</td><td>${fmt(f.maxLift, 0)} / ${fmt(f.maxDrag, 0)} N</td></tr>
       <tr><td>Peak load factor (lift ÷ weight)</td><td>${fmt(f.peakLoadFactor, 2)} g</td></tr>
       <tr><td>Distance with no lift (comparison)</td><td>${fmt(a.noLift.distance)} m</td></tr>
+      ${pocketRow(d, ev)}
     </table>
     <p class="hint">Every result here is labelled ${badge(src)} because it comes from the model${src === 'estimated' ? ' and uses estimated inputs' : ''}.
       <a href="#/design/${d.id}/calcs">How were these calculated? →</a></p>`;
@@ -176,6 +178,15 @@ export function update(panel, ctx) {
     <details class="explain" open><summary>What could we test next?</summary>${list(ex.next)}</details>`;
 
   updateMarkers(ctx);
+}
+
+// If parts are pocketed, show what the flight would be without it.
+function pocketRow(d, ev) {
+  if (!hasPocketing(d) || typeof d.values.craftMass === 'number') return '';
+  const ev0 = evaluate(withoutPocketing(d));
+  if (!ev0.analysis) return '';
+  const dm = ev.r.v.totalMass - ev0.r.v.totalMass;
+  return `<tr><td>Pocketing (lightweighting)</td><td>${fmt(dm, 1)} kg · distance without pocketing ${fmt(ev0.analysis.flight.distance)} m</td></tr>`;
 }
 
 async function setup3D(panel, ctx) {

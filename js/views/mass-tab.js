@@ -1,12 +1,12 @@
 // Mass & balance tab: parts list, totals, mass distribution, centre of mass, preliminary pitch-stability check.
 import { uid } from '../store.js';
-import { componentMass } from '../model.js';
+import { componentMass, partMassSource, pocketRemoval, pocketVolume, withoutPocketing, hasPocketing, evaluate, centerOfMass } from '../model.js';
 import { FIELD } from '../fields.js';
 import { stabilityCalcs } from '../calcs.js';
 import { esc, fmt, sig, badge, calcCardHTML, groupsHTML, refreshFields, bindFields } from '../ui.js';
 
 const CATEGORIES = ['Frame', 'Main wing', 'Tail', 'Landing structure', 'Decorations', 'Electronics', 'Fasteners & joints', 'Other'];
-const MASS_SRC = [['measured', 'Weighed'], ['entered', 'From spec / calculation'], ['estimated', 'Guess']];
+const MASS_SRC = [['measured', 'Weighed'], ['entered', 'From spec / calculation'], ['calculated', 'CAD volume × density'], ['estimated', 'Guess']];
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
 export function render(panel, ctx) {
@@ -23,6 +23,19 @@ export function render(panel, ctx) {
         Mark whether each mass was weighed, taken from a spec, or guessed — guesses make the totals <em>Estimated</em>. The pilot is entered on the Inputs tab (mass) and below (position).</p>
       <div class="table-wrap"><table class="parts-table" id="parts-table"></table></div>
     </div>
+    <div class="panel section">
+      <h2>Lightweighting (pocketing) &amp; mass from CAD volume</h2>
+      <p class="hint"><strong>Pocketing</strong> means cutting cavities or holes into a part to remove material that isn't carrying much load, making it lighter. There are two ways to include it:</p>
+      <ol class="hint">
+        <li><strong>From CAD:</strong> model the pockets in CAD, upload the model, copy its parts here (CAD tab), enter each part's material density, and click
+          <em>Use as part mass</em>. A pocketed model has less volume, so it automatically weighs less. Save the un-pocketed and pocketed models as two design versions to compare them.</li>
+        <li><strong>By hand:</strong> enter the part's mass <em>before</em> pocketing in the table above, then add its pockets below (how many × size × depth).
+          The removed material is subtracted. If you weighed the part <em>after</em> pocketing, don't add pockets — they would be subtracted twice.</li>
+      </ol>
+      <p class="hint">Density is never assumed: take it from the material datasheet, or weigh a sample and divide by its volume.</p>
+      <div id="lw-rows"></div>
+      <div id="lw-summary"></div>
+    </div>
     <div id="mass-summary"></div>
     <div class="panel section">
       <h2>Balance &amp; tail inputs</h2>
@@ -31,6 +44,8 @@ export function render(panel, ctx) {
     <div id="stability"></div>`;
 
   renderTable(panel, ctx);
+  renderLW(panel, ctx);
+  bindLW(panel, ctx);
   const table = panel.querySelector('#parts-table');
   table.addEventListener('input', (e) => {
     const row = e.target.closest('tr[data-id]');
@@ -55,12 +70,14 @@ export function render(panel, ctx) {
     if (!confirm(`Remove "${c.name || 'this part'}"?`)) return;
     ctx.d.components = ctx.d.components.filter((x) => x !== c);
     renderTable(panel, ctx);
+    renderLW(panel, ctx);
     ctx.changed(null);
   });
   const add = (name, category) => ctx.d.components.push({ id: uid(), name, category, mass: null, qty: 1, massSource: 'entered', material: '', dims: '', x: null, y: null, notes: '' });
   panel.querySelector('#add-part').addEventListener('click', () => {
     add('', 'Other');
     renderTable(panel, ctx);
+    renderLW(panel, ctx);
     ctx.changed(null);
     panel.querySelector('#parts-table tbody tr:last-child input')?.focus();
   });
@@ -69,6 +86,7 @@ export function render(panel, ctx) {
       if (!ctx.d.components.some((x) => x.name === n)) add(n, c);
     }
     renderTable(panel, ctx);
+    renderLW(panel, ctx);
     ctx.changed(null);
   });
 
@@ -79,6 +97,143 @@ export function render(panel, ctx) {
     if (g) ctx.gotoField(g.dataset.gotoField);
   });
   update(panel, ctx, null);
+}
+
+
+// ---------------------------------------------------------------------------
+// Lightweighting section (pocketing, mass from CAD volume × density)
+// ---------------------------------------------------------------------------
+function cadVolumeOf(d, c) {
+  if (isNum(c.cadVolume)) return c.cadVolume;
+  const p = isNum(c.cadPart) ? d.cad?.analysis?.parts?.find((x) => x.i === c.cadPart) : null;
+  return p && isNum(p.volume) ? p.volume : null;
+}
+
+function renderLW(panel, ctx) {
+  const d = ctx.d;
+  const box = panel.querySelector('#lw-rows');
+  if (!d.components.length) { box.innerHTML = '<p class="muted">Add parts above first.</p>'; return; }
+  box.innerHTML = d.components.map((c) => {
+    const vol = cadVolumeOf(d, c);
+    return `
+    <details class="lw-row" data-id="${c.id}" ${(c.pockets || []).length || isNum(c.density) || isNum(c.removedMass) || vol !== null ? 'open' : ''}>
+      <summary class="lw-head"><strong class="lw-name">${esc(c.name || 'Unnamed part')}</strong> <span class="lw-result small"></span></summary>
+      <div class="lw-grid">
+        <label>Material density <span class="unit">(kg/m³)</span><input data-lk="density" type="number" min="1" max="25000" step="any" value="${c.density ?? ''}" placeholder="from datasheet"></label>
+        <div class="lw-cad">${vol !== null
+          ? `CAD volume: <strong>${sig(vol, 4)} m³</strong> ${badge('measured')}<br><span class="lw-cadmass"></span>`
+          : '<span class="muted small">No CAD volume for this part (copy parts from the CAD tab; the part must be a closed shape).</span>'}</div>
+        <label>Or mass removed <span class="unit">(kg)</span><input data-lk="removedMass" type="number" min="0" step="any" value="${c.removedMass ?? ''}" placeholder="e.g. weighed offcuts"></label>
+      </div>
+      ${(c.pockets || []).length ? `<table class="pocket-table">
+        <thead><tr><th>Pocket shape</th><th>How many</th><th>Length or Ø (mm)</th><th>Width (mm)</th><th>Depth (mm)</th><th>Volume removed</th><th></th></tr></thead>
+        <tbody>${c.pockets.map((p, i) => `
+          <tr data-pi="${i}">
+            <td><select data-pk="shape"><option value="rect" ${p.shape !== 'round' ? 'selected' : ''}>Rectangular</option><option value="round" ${p.shape === 'round' ? 'selected' : ''}>Round hole</option></select></td>
+            <td><input data-pk="count" type="number" min="1" step="1" value="${p.count ?? 1}" class="tiny-in"></td>
+            <td><input data-pk="a" type="number" min="0" step="any" value="${p.a ?? ''}" class="short"></td>
+            <td><input data-pk="b" type="number" min="0" step="any" value="${p.b ?? ''}" class="short" ${p.shape === 'round' ? 'disabled placeholder="—"' : ''}></td>
+            <td><input data-pk="depth" type="number" min="0" step="any" value="${p.depth ?? ''}" class="short" placeholder="mm"></td>
+            <td class="num pv"></td>
+            <td><button type="button" class="reset" data-del-pocket="${i}" title="Remove pocket" aria-label="Remove pocket">✕</button></td>
+          </tr>`).join('')}</tbody>
+      </table>` : ''}
+      <button type="button" class="btn tiny" data-add-pocket>+ Add pocket</button>
+      <small class="muted">For a through-hole, depth = the part's thickness.</small>
+    </details>`;
+  }).join('');
+  updateLW(panel, ctx);
+}
+
+function bindLW(panel, ctx) {
+  const box = panel.querySelector('#lw-rows');
+  const comp = (el) => ctx.d.components.find((x) => x.id === el.closest('.lw-row')?.dataset.id);
+  box.addEventListener('input', (e) => {
+    const c = comp(e.target);
+    if (!c || e.target.dataset.pk === 'shape') return;
+    const num = e.target.value === '' ? null : parseFloat(e.target.value);
+    const bad = num !== null && (!Number.isFinite(num) || num < 0);
+    e.target.classList.toggle('bad', bad);
+    if (bad) return;
+    if (e.target.dataset.lk) c[e.target.dataset.lk] = num;
+    if (e.target.dataset.pk) c.pockets[Number(e.target.closest('tr').dataset.pi)][e.target.dataset.pk] = num;
+    ctx.changed(null);
+  });
+  box.addEventListener('change', (e) => {
+    if (e.target.dataset.pk !== 'shape') return;
+    comp(e.target).pockets[Number(e.target.closest('tr').dataset.pi)].shape = e.target.value;
+    renderLW(panel, ctx);
+    ctx.changed(null);
+  });
+  box.addEventListener('click', (e) => {
+    const c = comp(e.target);
+    if (!c) return;
+    if (e.target.matches('[data-add-pocket]')) {
+      (c.pockets ??= []).push({ shape: 'rect', count: 1, a: null, b: null, depth: null });
+      renderLW(panel, ctx);
+      ctx.changed(null);
+    } else if (e.target.closest('[data-del-pocket]')) {
+      c.pockets.splice(Number(e.target.closest('[data-del-pocket]').dataset.delPocket), 1);
+      renderLW(panel, ctx);
+      ctx.changed(null);
+    } else if (e.target.matches('[data-use-cad]')) {
+      c.mass = +(cadVolumeOf(ctx.d, c) * c.density).toFixed(3);
+      c.massSource = 'calculated';
+      c.massFromCad = true;
+      renderTable(panel, ctx);
+      ctx.changed(null);
+    }
+  });
+}
+
+function updateLW(panel, ctx) {
+  const d = ctx.d;
+  for (const row of panel.querySelectorAll('.lw-row')) {
+    const c = d.components.find((x) => x.id === row.dataset.id);
+    if (!c) continue;
+    row.querySelector('.lw-name').textContent = c.name || 'Unnamed part';
+    (c.pockets || []).forEach((p, i) => {
+      const v = pocketVolume(p);
+      const cell = row.querySelector(`tr[data-pi="${i}"] .pv`);
+      if (cell) cell.innerHTML = isNum(v) ? `${sig(v * 1e6, 3)} cm³` : '<span class="muted">needs sizes</span>';
+    });
+    const cm = row.querySelector('.lw-cadmass');
+    const vol = cadVolumeOf(d, c);
+    if (cm) cm.innerHTML = isNum(c.density)
+      ? `Volume × density = <strong>${sig(vol * c.density, 4)} kg</strong> ${badge('calculated')} <button type="button" class="btn tiny" data-use-cad>Use as part mass</button>
+         <br><small class="muted">Only valid for a solid part of one material (not hollow, foam-cored or covered).</small>`
+      : '<span class="muted small">Enter the density to calculate mass from this volume.</span>';
+    const rem = pocketRemoval(c);
+    const res = row.querySelector('.lw-result');
+    if (rem.none) res.innerHTML = '<span class="muted">no pocketing</span>';
+    else if (rem.ok === false) res.innerHTML = `<span class="error-msg">Pockets not subtracted: ${esc(rem.reason)}.</span>`;
+    else res.innerHTML = `removes <strong>${sig(rem.mass, 3)} kg</strong> per item ${badge('calculated')} → ${isNum(c.mass) ? `${sig(Math.max(0, c.mass - rem.mass), 4)} kg each (was ${c.mass} kg)` : 'enter the part mass (before pocketing) above'}`;
+  }
+
+  // With vs without pocketing
+  const out = panel.querySelector('#lw-summary');
+  if (!hasPocketing(d)) { out.innerHTML = ''; return; }
+  const plain = withoutPocketing(d);
+  const ev0 = evaluate(plain), ev1 = ctx.ev;
+  const com0 = centerOfMass(plain, ev0.r), com1 = ctx.com;
+  const removed = d.components.reduce((a, c) => { const r = pocketRemoval(c); return a + (r.ok ? r.mass * (isNum(c.qty) ? c.qty : 1) : 0); }, 0);
+  const typed = isNum(d.values.craftMass);
+  const row = (label, a, b, unit, dg = 2) => `<tr><td>${label}</td><td class="num">${isNum(a) ? sig(a, 4) + ' ' + unit : '–'}</td><td class="num">${isNum(b) ? sig(b, 4) + ' ' + unit : '–'}</td>
+    <td class="num">${isNum(a) && isNum(b) ? `${b - a >= 0 ? '+' : ''}${(b - a).toFixed(dg)} ${unit}` : '–'}</td></tr>`;
+  out.innerHTML = `
+    <h3>Effect of pocketing</h3>
+    ${typed ? '<div class="verdict warn">Craft mass is typed directly on the Inputs tab, so the simulation <strong>ignores the parts list and pocketing</strong>. Clear that field to use the parts total.</div>' : ''}
+    <table class="list-table"><thead><tr><th></th><th>Without pocketing</th><th>With pocketing</th><th>Change</th></tr></thead><tbody>
+      ${row('Material removed', 0, removed, 'kg')}
+      ${row('Total mass (craft + pilot)', ev0.r.v.totalMass, ev1.r.v.totalMass, 'kg')}
+      ${row('Centre of mass from nose', com0.x, com1.x, 'm', 3)}
+      ${row('Estimated distance', ev0.analysis?.flight.distance, ev1.analysis?.flight.distance, 'm')}
+      ${row('Estimated flight time', ev0.analysis?.flight.time, ev1.analysis?.flight.time, 's', 3)}
+      ${row('Stall speed', ev0.analysis?.stallSpeed, ev1.analysis?.stallSpeed, 'm/s')}
+    </tbody></table>
+    <p class="hint">Removed material is assumed to come from the part's listed position, so the centre of mass shifts only because of the mass change.
+      <strong>Pockets weaken parts.</strong> Pocketing isn't modelled in the Structure tab, and holes near highly stressed edges, joints or bolt holes can start cracks.
+      Keep material where the loads go (flanges, around fasteners) and remove it from lightly loaded webs.</p>`;
 }
 
 function renderTable(panel, ctx) {
@@ -105,6 +260,7 @@ function renderTable(panel, ctx) {
 export function update(panel, ctx, skipId) {
   const { d, ev, com } = ctx;
   const r = ev.r;
+  updateLW(panel, ctx);
   refreshFields(panel.querySelector('#stab-form'), d, r, { level: 'advanced', skipId });
 
   // ---- totals and distribution
@@ -130,7 +286,7 @@ export function update(panel, ctx, skipId) {
         </tbody></table>
         ${isNum(d.values.craftMass) && parts.length ? '<p class="hint">Craft mass is typed directly on the Inputs tab, so the parts total is <strong>not</strong> used by the simulation. Clear it there to use the parts total.</p>' : ''}
         ${d.components.some((c) => !isNum(componentMass(c))) ? `<p class="hint">${d.components.filter((c) => !isNum(componentMass(c))).length} part(s) have no mass yet and are not counted.</p>` : ''}
-        ${top.length ? `<h3>Heaviest parts</h3><ol class="plain-list numbered">${top.map((c) => `<li>${esc(c.name || 'Unnamed')} — ${fmt(componentMass(c), 1)} kg (${fmt(componentMass(c) / sum * 100, 0)}% of parts) ${badge(c.massSource || 'entered')}</li>`).join('')}</ol>` : ''}
+        ${top.length ? `<h3>Heaviest parts</h3><ol class="plain-list numbered">${top.map((c) => `<li>${esc(c.name || 'Unnamed')} — ${fmt(componentMass(c), 1)} kg (${fmt(componentMass(c) / sum * 100, 0)}% of parts) ${badge(partMassSource(c))}</li>`).join('')}</ol>` : ''}
       </div>
       <div class="panel section">
         <h2>Mass distribution</h2>

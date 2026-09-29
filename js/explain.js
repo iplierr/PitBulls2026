@@ -103,7 +103,7 @@ export function explain(ev, d, com, sens) {
   const estimated = Object.keys(r.src).filter((id) => r.src[id] === 'estimated' && (FIELD[id] || id === 'headwind' || id === 'totalMass'));
   for (const id of estimated) {
     const label = FIELD[id]?.label || { headwind: 'Headwind component', totalMass: 'Total mass' }[id];
-    const note = FIELD[id]?.assume?.note || r.how[id] || 'Marked as estimated.';
+    const note = d.sourceNote?.[id] || FIELD[id]?.assume?.note || r.how[id] || 'Marked as estimated.';
     out.assumptions.push(`${label}: ${isNum(r.v[id]) ? +r.v[id].toPrecision(4) : r.v[id]} ${FIELD[id]?.unit || ''} — ${note}`);
   }
   out.assumptions.push('The craft holds a constant angle of attack the whole flight (no pitching, no pilot input).');

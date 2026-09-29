@@ -137,7 +137,7 @@ export function refreshFields(container, d, r, { level = 'advanced', requiredIds
     div.querySelector('.src-badge').innerHTML = badge(src);
     div.querySelector('.reset').hidden = !hasStored;
     const how = div.querySelector('.derived-how');
-    how.textContent = derived && r.how[id] ? `How: ${r.how[id]}` : '';
+    how.textContent = derived && r.how[id] ? `How: ${r.how[id]}` : hasStored && d.sourceNote?.[id] ? `Source: ${d.sourceNote[id]}` : '';
     const assume = div.querySelector('.assume');
     if (assume) assume.hidden = hasStored || derived;
     const required = requiredIds.includes(id);
@@ -170,6 +170,7 @@ export function bindFields(container, getDesign, onChange) {
       if (!Number.isFinite(v) || v < f.min || v > f.max) invalid = true;
       else { d.values[f.id] = v; d.source[f.id] = 'entered'; }
     }
+    if (d.sourceNote) delete d.sourceNote[f.id]; // typed over: no longer from that source
     div.classList.toggle('invalid', invalid);
     const what = div.querySelector('.what');
     what.textContent = invalid ? `Enter a number from ${f.min} to ${f.max}${f.unit ? ' ' + f.unit : ''}. (Not saved until valid.)` : f.what;
@@ -181,6 +182,7 @@ export function bindFields(container, getDesign, onChange) {
     const reset = e.target.closest('.reset');
     if (reset) {
       const id = reset.closest('.field').dataset.id;
+      if (d.sourceNote) delete d.sourceNote[id];
       if (id in d.measured) { d.values[id] = d.measured[id]; d.source[id] = 'measured'; }
       else { delete d.values[id]; delete d.source[id]; }
       reset.closest('.field').classList.remove('invalid');
@@ -192,6 +194,7 @@ export function bindFields(container, getDesign, onChange) {
       const f = FIELD[assume.dataset.assume];
       d.values[f.id] = f.assume.value;
       d.source[f.id] = 'estimated';
+      if (d.sourceNote) delete d.sourceNote[f.id];
       onChange(null);
       return;
     }
