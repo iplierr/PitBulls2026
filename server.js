@@ -24,15 +24,29 @@ const RELOAD_SNIPPET = '<script>new EventSource("/__livereload").onmessage = () 
 
 // ---- live reload
 const clients = new Set();
+const mtimes = new Map(); // last seen modification time per file
+const started = Date.now();
 let timer = null;
+function reloadAll(file) {
+  clearTimeout(timer);
+  timer = setTimeout(() => {
+    for (const res of clients) res.write('data: reload\n\n');
+    if (clients.size) console.log(`Changed: ${file} → refreshing ${clients.size} tab(s)`);
+  }, 150);
+}
 try {
   fs.watch(ROOT, { recursive: true }, (_event, file) => {
     if (!file || /(^|[\\/])(\.git|node_modules)([\\/]|$)/.test(file)) return;
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      for (const res of clients) res.write('data: reload\n\n');
-      if (clients.size) console.log(`Changed: ${file} → refreshing ${clients.size} tab(s)`);
-    }, 150);
+    // Windows also reports a "change" when a file is only read (e.g. picking a CAD file to upload).
+    // Reload only if the file's modification time really changed, or it was added/deleted.
+    const full = path.join(ROOT, file);
+    fs.stat(full, (err, st) => {
+      const m = err ? -1 : st.mtimeMs;
+      const prev = mtimes.get(full);
+      mtimes.set(full, m);
+      const changed = prev === undefined ? (m === -1 || m > started) : prev !== m;
+      if (changed) reloadAll(file);
+    });
   });
 } catch {
   console.log('(Live reload is not available on this system — refresh the browser manually.)');

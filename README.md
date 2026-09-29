@@ -10,9 +10,9 @@ The app uses plain HTML, CSS and JavaScript, with Three.js for 3D. There's no fr
 
 You need [Node.js](https://nodejs.org). There's nothing to install.
 
-1. Open this folder in VS Code.
-2. In a terminal (**Terminal → New Terminal**), run `node server.js` (or `npm start`).
-3. Open **http://localhost:8080** in Chrome, Edge or Firefox.
+1. Double-click **`start-site.bat`**, or run `npm start` in a VS Code terminal.
+2. The preview opens at **http://localhost:8080**. It refreshes by itself whenever you save a file.
+3. To publish to the permanent website, run `npm run deploy`. See [PUBLISHING.md](PUBLISHING.md).
 
 Double-clicking `index.html` won't work, because browsers block JavaScript modules on `file://` pages. The first load needs internet access for Three.js.
 
