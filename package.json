@@ -1,0 +1,10 @@
+{
+  "name": "flugtag-lab",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Browser-based design, analysis and flight simulation lab for a Red Bull Flugtag team",
+  "scripts": {
+    "start": "node server.js",
+    "deploy": "node deploy.js"
+  }
+}

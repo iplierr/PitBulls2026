@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flugtag Lab</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9C%88%3C/text%3E%3C/svg%3E">
+  <!-- Three.js is loaded from a CDN (needs internet). See README to use a local copy. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <header class="topbar no-print">
+    <a class="brand" href="#/dashboard" title="Dashboard">✈ Flugtag Lab</a>
+    <nav class="topnav" id="topnav">
+      <a class="navlink" data-nav="dashboard" href="#/dashboard">Dashboard</a>
+      <a class="navlink" data-nav="design" id="nav-design" href="#/dashboard">Design</a>
+      <a class="navlink" data-nav="tests" href="#/tests">Physical tests</a>
+      <a class="navlink" data-nav="compare" href="#/compare">Compare</a>
+      <a class="navlink" data-nav="notebook" href="#/notebook">Notebook</a>
+    </nav>
+    <div class="topbar-tools">
+      <button class="navlink" id="open-converter" type="button" title="Convert feet, pounds, mph…">⇄ Units</button>
+      <label class="quality" title="Lower 3D quality is faster on older laptops">3D
+        <select id="quality-select">
+          <option value="low">Low</option>
+          <option value="normal">Normal</option>
+          <option value="high">High</option>
+        </select>
+      </label>
+    </div>
+  </header>
+
+  <div id="file-warning" class="banner no-print" hidden>
+    You opened this page directly from a file. The app needs a small local server to run.
+    In a terminal, run <code>node server.js</code> in the project folder, then open
+    <code>http://localhost:8080</code>. See README.md.
+  </div>
+  <div id="load-error" class="banner error no-print" hidden></div>
+  <div id="save-error" class="banner error no-print" hidden>
+    Could not save to browser storage (it may be full or blocked). Use <strong>Dashboard → Export backup</strong> so you don't lose work.
+  </div>
+
+  <main>
+    <section id="view-dashboard" class="view"></section>
+    <section id="view-design" class="view"></section>
+    <section id="view-tests" class="view"></section>
+    <section id="view-compare" class="view"></section>
+    <section id="view-notebook" class="view"></section>
+    <section id="view-report" class="view"></section>
+  </main>
+
+  <dialog id="converter" class="converter">
+    <form method="dialog">
+      <div class="panel-head"><h2>Unit converter</h2><button class="btn ghost small" value="close">Close</button></div>
+      <p class="hint">This app uses metric (SI) units. Convert values from rulebooks, tape measures or weather apps here.</p>
+      <div class="conv-row">
+        <input id="conv-value" type="number" step="any" value="1" aria-label="Value">
+        <select id="conv-from" aria-label="From unit"></select>
+      </div>
+      <table class="dims" id="conv-out"></table>
+    </form>
+  </dialog>
+
+  <script>
+    if (location.protocol === 'file:') document.getElementById('file-warning').hidden = false;
+  </script>
+  <script type="module" src="js/main.js" onerror="var b=document.getElementById('load-error');b.hidden=false;b.textContent='Could not load the app scripts. Three.js is loaded from the internet, so check your connection, then refresh.';"></script>
+</body>
+</html>
