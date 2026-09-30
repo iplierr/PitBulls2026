@@ -2,7 +2,8 @@
 import { db, uid, touch } from '../store.js';
 import { FIELD } from '../fields.js';
 import { analyzeCad, cadMeasurements } from '../cad-analysis.js';
-import { putCadFile, getCadFile, deleteCadFile } from '../idb.js';
+import { putCadFile, getCadFile } from '../idb.js';
+import { archiveCurrent, historyHTML, onHistoryClick, removeModelDialog } from './cad-history.js';
 import { esc, fmt, sig, badge, toast } from '../ui.js';
 
 const ROLES = [['', '—'], ['wing', 'Main wing'], ['htail', 'Horizontal tail'], ['vtail', 'Vertical tail (fin)'], ['body', 'Fuselage / frame'], ['other', 'Other']];
@@ -23,6 +24,10 @@ export function render(panel, ctx) {
           <span>or click to browse</span>
         </label>
         <p id="file-status" class="status">${cad ? `Current model: <strong>${esc(cad.fileName)}</strong>` : ''}</p>
+        ${cad ? `<div class="fix-box">
+          <strong>Uploaded the wrong file?</strong> Drop the right one above — the current model is kept in Model history.
+          <div class="row-actions" style="margin-top:6px"><button class="btn small danger" id="remove-model" type="button">Remove model…</button></div>
+        </div>` : (ctx.d.cadHistory?.length ? '<p class="hint">Earlier models are listed in <strong>Model history</strong> below.</p>' : '')}
 
         <h2>2. Check units &amp; orientation</h2>
         <div class="form-row">
@@ -58,7 +63,8 @@ export function render(panel, ctx) {
         <p class="hint">Drag to rotate · right-drag to pan · scroll to zoom</p>
       </div>
     </div>
-    <div id="cad-analysis"></div>`;
+    <div id="cad-analysis"></div>
+    <div id="cad-history-host"></div>`;
 
   const viewer = ctx.app.viewer;
   viewer.mount(panel.querySelector('#cad-viewer'));
@@ -83,6 +89,8 @@ export function render(panel, ctx) {
 
   panel.querySelector('#cad-analysis').addEventListener('change', onAnalysisChange);
   panel.querySelector('#cad-analysis').addEventListener('click', onAnalysisClick);
+  panel.querySelector('#cad-history-host').addEventListener('click', (e) => onHistoryClick(e, P.ctx));
+  panel.querySelector('#remove-model')?.addEventListener('click', () => removeModelDialog(P.ctx));
 
   if (cad) restoreSaved();
   else renderAnalysis();
@@ -133,17 +141,17 @@ async function handleFile(file) {
   try {
     const ext = file.name.split('.').pop().toLowerCase();
     const { triangles } = await app.viewer.loadFile(file);
-    const oldKey = d.cad?.cadKey;
     const key = uid();
     const stored = await putCadFile(key, file);
     app.viewer.loadedKey = key;
     const unitSel = P.panel.querySelector('#unit-select');
     if (ext === 'glb') unitSel.value = '1'; // glTF is defined in metres
+    const hadModel = !!d.cad;
+    archiveCurrent(d, 'replaced by ' + file.name);
     d.cad = { fileName: file.name, fileSize: file.size, cadKey: stored ? key : null, units: unitSel.value,
       up: P.panel.querySelector('#up-select').value, swapped: false, noseFlip: false, roles: {}, analysis: null };
-    if (oldKey && !db.designs.some((x) => x !== d && x.cad?.cadKey === oldKey)) deleteCadFile(oldKey);
     const big = triangles > 500000 ? ' Large model: rotating may be slow on older laptops (try 3D quality: Low).' : '';
-    setStatus(`Loaded <strong>${esc(file.name)}</strong> (${triangles.toLocaleString()} triangles).${big}${stored ? '' : ' (Could not store the file in the browser — you will need to re-upload it after a refresh.)'}`, 'ok');
+    setStatus(`Loaded <strong>${esc(file.name)}</strong> (${triangles.toLocaleString()} triangles).${big}${stored ? '' : ' (Could not store the file in the browser — you will need to re-upload it after a refresh.)'}${hadModel ? ' The previous model is in Model history below.' : ''}`, 'ok');
     retransform(true);
   } catch (err) {
     console.error(err);
@@ -247,6 +255,7 @@ function orientationWarning(an, roles) {
 function renderAnalysis() {
   const host = P.panel.querySelector('#cad-analysis');
   const d = P.ctx.d;
+  P.panel.querySelector('#cad-history-host').innerHTML = historyHTML(d);
   const an = d.cad?.analysis;
   if (!an) { host.innerHTML = ''; return; }
   const roles = d.cad.roles || {};

@@ -21,7 +21,7 @@ Double-clicking `index.html` won't work, because browsers block JavaScript modul
 | Screen | What it's for |
 |---|---|
 | **Dashboard** | Start a design (Upload CAD / Enter manually), open, **New version** (1 → 1.1 → 1.2), **Duplicate** (→ Design 2), delete, backup/import |
-| Design → **Overview** | Flight estimate, problem checks, "What information do we have?" checklist |
+| Design → **Overview** | Flight estimate, **Red Bull Flugtag Miami 2026 rules check** (28 ft span, 20 ft length, 400 lb with pilot, 10 ft crouched height) with suggested fixes, "What could we fix?" engineering suggestions, problem checks, "What information do we have?" checklist |
 | Design → **Inputs** | All design inputs, shown as Basic / More details / Advanced, with "What is this?" help and a live estimate. **Get weather from NASA**: pick the event location and date to pull real wind, temperature and pressure (NASA POWER) |
 | Design → **CAD model** | STL/GLB upload, units and orientation, geometry analysis, part roles (wing, tail, fin), apply measurements |
 | Design → **Mass & balance** | Parts list with masses and positions, **pocketing / lightweighting** (by hand, or mass from CAD volume × density) with a with-vs-without flight comparison, mass distribution, centre of mass, side-view diagram, preliminary static-margin check |
@@ -34,6 +34,19 @@ Double-clicking `index.html` won't work, because browsers block JavaScript modul
 | **Notebook** | Dated engineering log linked to design versions |
 | **Report / export** | Printable report (Print → Save as PDF), simulation time series (CSV), inputs and results (CSV), design (JSON) |
 | **⇄ Units** | Converter for ft, in, lb, mph, knots, psi, °F … |
+
+## Fixing mistakes
+
+- **Undo / Redo** (top of every design, or Ctrl+Z / Ctrl+Y outside text boxes). This covers every change: inputs, parts, pocketing, CAD measurements, removing a model. The history is kept while the page stays open.
+- **Start over…** clears a design's inputs, parts, CAD model or NASA weather (you choose which). The name, version and tests are kept, and it can be undone.
+- **Delete** moves a design, test or notebook entry to **Dashboard → Recently deleted**, where it can be restored for 30 days.
+- **Wrong CAD file?** Drop the right one, or use **Remove model…**. Replaced and removed models stay in **Model history** on the CAD tab, where you can switch back, see what changed between versions, or delete old ones.
+
+## Event rules
+
+The Overview tab checks the design against the **official Red Bull Flugtag Miami 2026 rules**, read from redbull.com on 2026-09-29: wingspan ≤ 28 ft, nose-to-tail ≤ 20 ft, craft + pilot ≤ 400 lb, and height with the pilot crouched ≤ 10 ft. It also gives a checklist for the rules you confirm yourselves (human power only, floats, no toxic materials, and so on).
+
+The deck height is **not confirmed**: the rules page says 22 ft, but some Miami event listings say 30 ft. Ask the organisers. Rules can change, so re-check the page before the event.
 
 ## Source labels
 

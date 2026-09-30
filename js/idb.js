@@ -36,6 +36,16 @@ export async function getCadFile(key) {
   } catch { return null; }
 }
 
+export async function allCadKeys() {
+  try { return (await tx('readonly', (s) => s.getAllKeys())) || []; } catch { return []; }
+}
+
+// Deletes stored CAD files that nothing refers to any more (keysInUse: Set of keys to keep).
+export async function cleanupCadFiles(keysInUse) {
+  const keys = await allCadKeys();
+  for (const k of keys) if (!keysInUse.has(k)) await deleteCadFile(k);
+}
+
 export async function deleteCadFile(key) {
   try { await tx('readwrite', (s) => s.delete(key)); } catch { /* ignore */ }
 }

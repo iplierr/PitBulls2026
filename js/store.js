@@ -9,6 +9,7 @@ export const db = {
   designs: [],
   tests: [],
   notes: [],
+  trash: [],
   currentId: null,
   settings: { quality: 'normal', level: 'basic' },
 };
@@ -71,6 +72,7 @@ function normalizeDesign(d) {
   d.measured ??= {};
   d.components ??= [];
   d.cad ??= null;
+  d.cadHistory ??= [];
   d.description ??= '';
 }
 
@@ -126,9 +128,69 @@ export function touch(d) {
 }
 
 export function deleteDesign(id) {
-  db.designs = db.designs.filter((d) => d.id !== id);
+  const d = getDesign(id);
+  if (d) toTrash('design', d);
+  db.designs = db.designs.filter((x) => x.id !== id);
   if (db.currentId === id) db.currentId = db.designs[0]?.id ?? null;
   save();
+}
+
+// ---------------------------------------------------------------------------
+// Recently deleted: designs, tests and notes go here first and can be restored.
+// Items older than 30 days (or beyond 40 items) are removed for good.
+// ---------------------------------------------------------------------------
+const TRASH_DAYS = 30;
+const TRASH_MAX = 40;
+const LISTS = { design: 'designs', test: 'tests', note: 'notes' };
+
+export function toTrash(kind, item) {
+  db.trash ??= [];
+  db.trash.unshift({ id: uid(), kind, item: JSON.parse(JSON.stringify(item)), deletedAt: new Date().toISOString() });
+  const cutoff = Date.now() - TRASH_DAYS * 86400000;
+  db.trash = db.trash.filter((t) => Date.parse(t.deletedAt) > cutoff).slice(0, TRASH_MAX);
+}
+
+// Removes a test or note (to the bin) and saves.
+export function deleteItem(kind, id) {
+  const list = LISTS[kind];
+  const item = db[list].find((x) => x.id === id);
+  if (!item) return;
+  toTrash(kind, item);
+  db[list] = db[list].filter((x) => x.id !== id);
+  save();
+}
+
+export function restoreFromTrash(trashId) {
+  const t = (db.trash || []).find((x) => x.id === trashId);
+  if (!t) return null;
+  const list = db[LISTS[t.kind]];
+  const item = t.item;
+  if (list.some((x) => x.id === item.id)) item.id = uid(); // never overwrite a live item
+  if (t.kind === 'design') {
+    normalizeDesign(item);
+    if (db.designs.some((x) => String(x.label) === String(item.label))) item.label = nextMajorLabel();
+  }
+  list.push(item);
+  db.trash = db.trash.filter((x) => x.id !== trashId);
+  save();
+  return { kind: t.kind, item };
+}
+
+export function purgeTrash(trashId) {
+  db.trash = (db.trash || []).filter((x) => trashId && x.id !== trashId);
+  save();
+}
+
+// Every stored CAD file still referenced by a design (current model or model history) or the bin.
+export function cadKeysInUse() {
+  const keys = new Set();
+  const add = (d) => {
+    if (d?.cad?.cadKey) keys.add(d.cad.cadKey);
+    for (const h of d?.cadHistory || []) if (h.cadKey) keys.add(h.cadKey);
+  };
+  db.designs.forEach(add);
+  (db.trash || []).filter((t) => t.kind === 'design').forEach((t) => add(t.item));
+  return keys;
 }
 
 export function sortedDesigns() {

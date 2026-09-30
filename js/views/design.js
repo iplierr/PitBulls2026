@@ -1,5 +1,6 @@
 // Design workspace: header, tabs, Overview and Inputs tabs. Other tabs live in their own modules.
-import { db, getDesign, touch, newVersion, duplicateAsNew, designTitle } from '../store.js';
+import { db, getDesign, touch, newVersion, duplicateAsNew, designTitle, deleteDesign } from '../store.js';
+import * as history from '../history.js';
 import { FIELD, GROUPS, LEVELS, LEVEL_LABEL } from '../fields.js';
 import { evaluate, centerOfMass, sanityChecks, completeness, assumableMissing, applyAssumptions } from '../model.js';
 import { esc, fmt, badge, toast, groupsHTML, refreshFields, bindFields, focusField } from '../ui.js';
@@ -10,6 +11,7 @@ import * as simTab from './sim-tab.js';
 import * as whatifTab from './whatif-tab.js';
 import * as calcTab from './calc-tab.js';
 import { nasaPanelHTML, bindNasaPanel, refreshNasaPanel } from './nasa-panel.js';
+import { rulesPanelHTML, bindRulesPanel } from './rules-panel.js';
 
 const overviewTab = { render: renderOverview, update: renderOverview };
 const inputsTab = { render: renderInputs, update: updateInputs };
@@ -41,10 +43,18 @@ const ctx = {
   // Called after any change to the design
   changed(fieldId = null) {
     touch(S.d);
+    history.record(S.d);
     compute();
     updateHeader();
     const panel = S.el.querySelector('.tab-panel');
     TAB[S.tab].mod.update?.(panel, ctx, fieldId);
+  },
+  // Re-draws the current tab from scratch (after undo/redo/start over)
+  rerender() {
+    compute();
+    S.el.querySelector('#design-name').value = S.d.name || '';
+    updateHeader();
+    show(S.el, S.app, { id: S.d.id, tab: S.tab });
   },
   gotoField(id) {
     const tab = { inputs: 'inputs', stability: 'mass', structure: 'structure' }[GROUPS.find((g) => g.id === FIELD[id]?.group)?.tab] || 'inputs';
@@ -72,6 +82,7 @@ function leaveTab() {
 
 export function show(el, app, { id, tab }) {
   const d = getDesign(id);
+  history.track(d);
   tab = TAB[tab] ? tab : 'overview';
   if (!S || S.d !== d || S.el !== el) {
     S = { el, app, d, tab, pendingFocus: S?.d === d ? S.pendingFocus : null };
@@ -100,12 +111,16 @@ function renderShell() {
       <div class="design-title">
         <span class="label-chip">Design ${esc(d.label)}</span>
         <input class="design-name" id="design-name" placeholder="Name this design (e.g. Bat Wing)" maxlength="60" value="${esc(d.name)}">
+        <button class="btn small" id="btn-undo" title="Undo the last change (Ctrl+Z)">↶ Undo</button>
+        <button class="btn small" id="btn-redo" title="Redo (Ctrl+Y)">↷ Redo</button>
       </div>
       <div class="design-status" id="design-status"></div>
       <div class="row-actions">
         <button class="btn small" id="btn-version" title="Copy as the next version, e.g. 1 → 1.1">New version</button>
         <button class="btn small" id="btn-dup">Duplicate</button>
         <a class="btn small" href="#/report/${d.id}">Report / export</a>
+        <button class="btn small" id="btn-restart" title="Clear this design and start again (can be undone)">Start over…</button>
+        <button class="btn small danger" id="btn-delete" title="Move this design to Recently deleted">Delete</button>
       </div>
     </div>
     <div class="legend-inline">
@@ -119,7 +134,24 @@ function renderShell() {
   S.el.querySelector('#design-name').addEventListener('input', (e) => {
     S.d.name = e.target.value;
     touch(S.d);
+    history.record(S.d);
+    updateHeader();
     S.app.refreshNav();
+  });
+  S.el.querySelector('#btn-undo').addEventListener('click', doUndo);
+  S.el.querySelector('#btn-redo').addEventListener('click', doRedo);
+  S.el.querySelector('#btn-restart').addEventListener('click', startOver);
+  S.el.querySelector('#btn-delete').addEventListener('click', () => {
+    const tests = db.tests.filter((t) => t.designId === S.d.id).length;
+    if (!confirm(`Delete ${designTitle(S.d)}?
+
+It moves to "Recently deleted" on the Dashboard, where you can restore it for 30 days.${tests ? `
+Its ${tests} physical test(s) are kept.` : ''}`)) return;
+    const title = designTitle(S.d);
+    deleteDesign(S.d.id);
+    S = null;
+    toast(`${title} moved to Recently deleted (Dashboard).`);
+    location.hash = '#/dashboard';
   });
   S.el.querySelector('#btn-version').addEventListener('click', () => {
     const n = newVersion(S.d);
@@ -133,7 +165,72 @@ function renderShell() {
   });
 }
 
+function doUndo() {
+  if (!S || !history.undo(S.d)) return;
+  touch(S.d);
+  toast('Undone.');
+  S.app.refreshNav();
+  ctx.rerender();
+}
+
+function doRedo() {
+  if (!S || !history.redo(S.d)) return;
+  touch(S.d);
+  toast('Redone.');
+  S.app.refreshNav();
+  ctx.rerender();
+}
+
+// Ctrl+Z / Ctrl+Y on the design screen (but not while typing in a box — the browser's own undo handles that)
+document.addEventListener('keydown', (e) => {
+  if (!S || !S.el.classList.contains('active') || !(e.ctrlKey || e.metaKey)) return;
+  if (e.target.closest('input, textarea, select, [contenteditable]')) return;
+  const k = e.key.toLowerCase();
+  if (k === 'z' && !e.shiftKey) { e.preventDefault(); doUndo(); }
+  else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); doRedo(); }
+});
+
+function startOver() {
+  let dlg = document.getElementById('restart-dialog');
+  if (!dlg) {
+    dlg = document.createElement('dialog');
+    dlg.id = 'restart-dialog';
+    dlg.className = 'converter';
+    document.body.appendChild(dlg);
+  }
+  const d = S.d;
+  dlg.innerHTML = `
+    <form method="dialog">
+      <h2>Start over with Design ${esc(d.label)}?</h2>
+      <p class="hint">Choose what to clear. The name, version number and physical tests are kept. You can press <strong>Undo</strong> afterwards if you change your mind.</p>
+      <label class="check-row"><input type="checkbox" name="inputs" checked> Clear all inputs (sizes, masses, launch, wind &amp; air, aerodynamics, balance, structure)</label>
+      <label class="check-row"><input type="checkbox" name="parts" checked> Clear the parts list and pocketing (${d.components.length} part(s))</label>
+      <label class="check-row"><input type="checkbox" name="cad" ${d.cad ? '' : 'disabled'}> Remove the CAD model ${d.cad ? `(${esc(d.cad.fileName)} — kept in model history)` : '(none loaded)'}</label>
+      <label class="check-row"><input type="checkbox" name="weather" ${d.weather ? '' : 'disabled'}> Clear the NASA weather download</label>
+      <div class="row-actions" style="margin-top:12px">
+        <button class="btn primary" value="ok">Start over</button>
+        <button class="btn" value="cancel">Cancel</button>
+      </div>
+    </form>`;
+  dlg.onclose = () => {
+    if (dlg.returnValue !== 'ok') return;
+    const f = dlg.querySelector('form');
+    if (f.inputs.checked) { d.values = {}; d.source = {}; d.measured = {}; d.sourceNote = {}; }
+    if (f.parts.checked) d.components = [];
+    if (f.cad.checked && d.cad) { d.cadHistory = [{ ...d.cad, removedAt: new Date().toISOString() }, ...(d.cadHistory || [])].slice(0, 10); d.cad = null; }
+    if (f.weather.checked) delete d.weather;
+    touch(d);
+    history.record(d);
+    toast('Started over. Press Undo to get everything back.');
+    ctx.rerender();
+  };
+  dlg.returnValue = '';
+  dlg.showModal();
+}
+
 function updateHeader() {
+  const u = S.el.querySelector('#btn-undo'), r = S.el.querySelector('#btn-redo');
+  if (u) { u.disabled = !history.canUndo(S.d); r.disabled = !history.canRedo(S.d); }
   const a = S.ev.analysis;
   S.el.querySelector('#design-status').innerHTML = a
     ? `Estimate: <strong>${fmt(a.flight.distance)} m</strong> · ${fmt(a.flight.time, 2)} s ${badge(simulationSource(S.ev.r))}`
@@ -204,6 +301,8 @@ function renderOverview(panel) {
           : missingBlockHTML(ev)}
         </div>
 
+        ${rulesPanelHTML(d, ev, com)}
+
         <div class="panel section">
           <h2>Problem checks</h2>
           ${checks.length ? `<ul class="check-list">${checks.map((c) => `
@@ -238,10 +337,11 @@ function renderOverview(panel) {
       </div>
     </div>`;
 
-  panel.querySelector('#design-desc').addEventListener('input', (e) => { S.d.description = e.target.value; touch(S.d); });
+  panel.querySelector('#design-desc').addEventListener('input', (e) => { S.d.description = e.target.value; touch(S.d); history.record(S.d); updateHeader(); });
   if (firstBind) {
     panel.dataset.bound = '1';
     bindMissingBlock(panel);
+    bindRulesPanel(panel, ctx, () => {});
     panel.addEventListener('click', (e) => {
       const t = e.target.closest('[data-go-tab]');
       if (t) ctx.goTab(t.dataset.goTab);

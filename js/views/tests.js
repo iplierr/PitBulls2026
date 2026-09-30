@@ -1,5 +1,5 @@
 // Physical tests: record real-world tests, list them, compare each with the simulation under the same conditions.
-import { db, uid, save, today, sortedDesigns, designTitle, getDesign } from '../store.js';
+import { db, uid, save, today, sortedDesigns, designTitle, getDesign, deleteItem } from '../store.js';
 import { evaluate } from '../model.js';
 import { simulationSource } from '../calcs.js';
 import { lineChart } from '../charts.js';
@@ -140,9 +140,9 @@ export function show(el) {
     const id = b.closest('tr').dataset.id;
     if (b.dataset.act === 'edit') { editingId = id; show(el); el.querySelector('#test-form-wrap').scrollIntoView(); }
     if (b.dataset.act === 'cmp') { compareId = id; renderCompare(el); el.querySelector('#svr').scrollIntoView({ behavior: 'smooth' }); }
-    if (b.dataset.act === 'del' && confirm('Delete this test? This cannot be undone.')) {
-      db.tests = db.tests.filter((t) => t.id !== id);
-      save();
+    if (b.dataset.act === 'del' && confirm('Delete this test? You can restore it from Dashboard → Recently deleted.')) {
+      deleteItem('test', id);
+      toast('Test moved to Recently deleted.');
       show(el);
     }
   });

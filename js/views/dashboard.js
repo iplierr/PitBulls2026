@@ -1,8 +1,25 @@
 // Dashboard: start a design (CAD or manual), open / version / duplicate designs, backups.
-import { db, createDesign, newVersion, duplicateAsNew, deleteDesign, sortedDesigns, designTitle, exportJSON, importJSON, today } from '../store.js';
+import { db, createDesign, newVersion, duplicateAsNew, deleteDesign, sortedDesigns, designTitle, exportJSON, importJSON, today, restoreFromTrash, purgeTrash } from '../store.js';
+import { cleanupFiles } from './cad-history.js';
 import { evaluate } from '../model.js';
 import { esc, fmt, download, toast, toCSV } from '../ui.js';
 import { testsCSV } from './tests.js';
+
+const KIND_LABEL = { design: 'Design', test: 'Physical test', note: 'Notebook entry' };
+function trashHTML() {
+  const items = db.trash || [];
+  if (!items.length) return '';
+  const name = (t) => t.kind === 'design' ? designTitle(t.item) : t.kind === 'test' ? `Test ${t.item.number} (${t.item.date})` : t.item.title;
+  return `
+    <div class="panel section" id="trash">
+      <div class="panel-head"><h2>Recently deleted</h2><button class="btn small danger" data-trash="empty">Empty</button></div>
+      <p class="hint">Deleted designs, tests and notebook entries stay here for 30 days. Restore anything deleted by mistake.</p>
+      <table class="list-table"><tbody>
+        ${items.map((t) => `<tr><td>${KIND_LABEL[t.kind]}</td><td>${esc(name(t))}</td><td class="muted small">deleted ${esc(t.deletedAt.slice(0, 16).replace('T', ' '))}</td>
+          <td class="row-actions"><button class="btn tiny" data-trash="restore" data-id="${t.id}">Restore</button><button class="btn tiny danger" data-trash="purge" data-id="${t.id}">Delete forever</button></td></tr>`).join('')}
+      </tbody></table>
+    </div>`;
+}
 
 export function show(el, app) {
   const designs = sortedDesigns();
@@ -81,6 +98,8 @@ export function show(el, app) {
       </div>
     </div>
 
+${trashHTML()}
+
     <div class="panel section">
       <h2>Backup &amp; sharing</h2>
       <p class="hint">Everything is saved in <strong>this browser on this computer only</strong>. To share with teammates or move to another laptop,
@@ -108,11 +127,34 @@ export function show(el, app) {
     if (act === 'dup') { const n = duplicateAsNew(d); toast(`Created Design ${n.label}`); app.go(`#/design/${n.id}/overview`); }
     if (act === 'del') {
       const tests = db.tests.filter((t) => t.designId === d.id).length;
-      if (!confirm(`Delete ${designTitle(d)}?${tests ? ` Its ${tests} physical test(s) will be kept but lose their design link.` : ''} This cannot be undone.`)) return;
+      if (!confirm(`Delete ${designTitle(d)}?
+
+It moves to "Recently deleted" below, where you can restore it for 30 days.${tests ? ` Its ${tests} physical test(s) are kept.` : ''}`)) return;
       deleteDesign(d.id);
+      toast(`${designTitle(d)} moved to Recently deleted.`);
       show(el, app);
       app.refreshNav();
     }
+  });
+
+  el.querySelector('#trash')?.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-trash]');
+    if (!b) return;
+    const id = b.dataset.id;
+    if (b.dataset.trash === 'restore') {
+      const r = restoreFromTrash(id);
+      if (r) toast(r.kind === 'design' ? `Restored ${designTitle(r.item)}.` : `Restored the ${r.kind}.`);
+    } else if (b.dataset.trash === 'purge') {
+      if (!confirm('Delete this permanently? This cannot be undone.')) return;
+      purgeTrash(id);
+      cleanupFiles();
+    } else if (b.dataset.trash === 'empty') {
+      if (!confirm(`Permanently delete all ${db.trash.length} item(s) in Recently deleted? This cannot be undone.`)) return;
+      purgeTrash(null);
+      cleanupFiles();
+    }
+    show(el, app);
+    app.refreshNav();
   });
 
   el.querySelector('#export-all').addEventListener('click', () => download(`flugtag-lab-backup-${today()}.json`, exportJSON(), 'application/json'));

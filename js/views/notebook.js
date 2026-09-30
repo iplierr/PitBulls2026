@@ -1,5 +1,5 @@
 // Engineering notebook: dated entries for decisions, changes, observations, ideas, meetings, findings.
-import { db, uid, save, today, sortedDesigns, designTitle, getDesign } from '../store.js';
+import { db, uid, save, today, sortedDesigns, designTitle, getDesign, deleteItem } from '../store.js';
 import { esc, toast, download, toCSV } from '../ui.js';
 
 export const CATEGORIES = ['Design decision', 'Change made', 'Test observation', 'Measurement', 'Problem', 'Idea', 'Meeting notes', 'Simulation finding', 'Physical test finding'];
@@ -71,7 +71,7 @@ export function show(el) {
     if (!b) return;
     const id = b.closest('[data-id]').dataset.id;
     if (b.dataset.act === 'edit') { editingId = id; show(el); window.scrollTo(0, 0); }
-    if (b.dataset.act === 'del' && confirm('Delete this entry?')) { db.notes = db.notes.filter((n) => n.id !== id); save(); renderList(el); }
+    if (b.dataset.act === 'del' && confirm('Delete this entry? You can restore it from Dashboard → Recently deleted.')) { deleteItem('note', id); toast('Entry moved to Recently deleted.'); renderList(el); }
   });
   renderList(el);
 }

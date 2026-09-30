@@ -111,3 +111,6 @@ document.getElementById('conv-value').addEventListener('input', convert);
 document.getElementById('open-converter').addEventListener('click', () => { convert(); document.getElementById('converter').showModal(); });
 
 route();
+
+// Remove stored CAD files that no design, model history or deleted item uses any more.
+import('./views/cad-history.js').then((m) => m.cleanupFiles());

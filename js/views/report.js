@@ -4,6 +4,7 @@ import { FIELDS, FIELD } from '../fields.js';
 import { evaluate, centerOfMass, sanityChecks, componentMass, partMassSource, pocketRemoval, SOURCE_LABEL } from '../model.js';
 import { designCalcs, stabilityCalcs, structureCalcs, simulationSource } from '../calcs.js';
 import { explain, sensitivity } from '../explain.js';
+import { rulesetOf, ruleChecks, engineeringFixes } from '../rules.js';
 import { TrajectoryView } from '../trajectory.js';
 import { lineChart } from '../charts.js';
 import { simFor } from './tests.js';
@@ -67,6 +68,21 @@ export function show(el, app, { id }) {
         <div><h3>Height vs time</h3><canvas class="chart" id="rep-h"></canvas></div>
         <div><h3>Lift &amp; drag vs time</h3><canvas class="chart" id="rep-f"></canvas></div>
       </div>` : `<p>The simulation could not run. Missing: ${ev.missing.map((m) => esc(m.label)).join(', ')}.</p>`}
+
+      <h2>Event rules check</h2>
+      ${(() => {
+        const rs = rulesetOf(d);
+        if (!rs) return '<p class="muted">No event rules selected.</p>';
+        const cks = ruleChecks(d, ev, com);
+        const done = d.ruleChecks || {};
+        return `<p class="small">${esc(rs.name)} — ${esc(rs.event)}. Source: ${esc(rs.source)} (read ${rs.checked}).</p>
+          <table class="list-table report-table"><thead><tr><th>Rule</th><th>Limit</th><th>Design</th><th>Status</th></tr></thead><tbody>
+          ${cks.map((c) => `<tr><td>${esc(c.label)}</td><td>${esc(c.limitText)}</td><td class="num">${isNum(c.value) ? c.value.toFixed(2) + ' ' + c.unit : 'not provided'}</td>
+            <td>${{ ok: 'within limit', close: 'within 3% of limit', over: 'OVER', unknown: 'cannot check' }[c.status]}${c.fixes.length && c.status !== 'unknown' ? '<br><small>' + c.fixes.map(esc).join('<br>') + '</small>' : ''}</td></tr>`).join('')}
+          </tbody></table>
+          <p class="small">Team-confirmed rules: ${rs.manual.filter(([id]) => done[id]).length} of ${rs.manual.length}. Not confirmed: ${rs.manual.filter(([id]) => !done[id]).map(([, t]) => esc(t)).join(' · ') || 'none'}.</p>
+          <h3>What could we fix?</h3><ul>${engineeringFixes(d, ev, com).map((f) => `<li><strong>${esc(f.title)}</strong> — ${esc(f.detail)}</li>`).join('')}</ul>`;
+      })()}
 
       <h2>2. Design inputs</h2>
       ${d.weather ? `<p class="small">Weather data: NASA POWER (MERRA-2) for ${fmt(d.weather.lat, 2)}, ${fmt(d.weather.lon, 2)}, ${d.weather.mode === 'actual' ? 'on ' + esc(d.weather.date) : 'typical for the week of ' + esc(d.weather.date)} — area average, not measured at the deck.</p>` : ''}
