@@ -19,8 +19,11 @@ export const RULESETS = {
     source: 'https://www.redbull.com/us-en/events/flugtag-miami/flugtag-miami-rules-2026-06-09',
     checked: '2026-09-29',
     quote: 'Your design must be no longer than 28 feet from wing-tip to wing-tip and max. 20 feet from nose to tail. Craft and pilot cannot exceed 400 lbs. The pilot on must be in a good crouch position, not exceeding 10 ft high.',
+    faqSource: 'https://www.redbull.com/us-en/events/flugtag-miami/ft-miami-faqs',
+    faqQuote: 'All crafts must be human-powered – no engines or external energy sources allowed. Prefabricated crafts will not be accepted. Each craft must be less than 22-feet wide and not more than 400 lbs. (including the pilot), and craft pilots must be at least 18 years old.',
+    spanConflict: 'Red Bull’s two Miami pages disagree: the FAQ says the craft must be less than 22 ft wide, the rules page says up to 28 ft wing-tip to wing-tip. The app checks the stricter 22 ft. Ask the organisers which applies.',
     limits: {
-      span: 28 * FT,          // 8.534 m
+      span: 22 * FT,          // 6.706 m — FAQ "less than 22-feet wide" (stricter of the two official pages)
       length: 20 * FT,        // 6.096 m
       totalMass: 400 * LB,    // 181.4 kg, craft + pilot
       crouchHeight: 10 * FT,  // 3.048 m
@@ -39,7 +42,7 @@ export const RULESETS = {
       ['toxic', 'No toxic materials that may dissolve in water; avoid materials that fragment or are hard to clear up.'],
       ['cockpit', 'No hard or sharp surfaces around the cockpit.'],
       ['strap', 'Pilot is NOT strapped in or enclosed in a capsule/cockpit they can\'t readily escape.'],
-      ['teambuilt', 'Entirely designed and built by the team — not an adapted light aircraft or hang-glider.'],
+      ['teambuilt', 'Entirely designed and built by the team — not an adapted light aircraft or hang-glider. Prefabricated crafts are not accepted.'],
       ['team', 'Team of five: one pilot (18+) and four ground crew (16+).'],
       ['swim', 'Everyone who jumps can swim 100 yards unaided (in costume).'],
       ['costume', 'Costumes can\'t catch on the craft or stop the pilot seeing, breathing or floating.'],
@@ -63,12 +66,16 @@ export function ruleChecks(d, ev, com) {
 
   // Wingspan
   {
-    const val = v.span;
-    const c = { id: 'span', label: 'Wingspan (wing-tip to wing-tip)', limit: L.span, limitText: '28 ft (8.53 m)', value: val, unit: 'm', src: src.span, status: status(val, L.span), fixes: [] };
+    const useWidth = isNum(v.width) && (!isNum(v.span) || v.width > v.span);
+    const val = useWidth ? v.width : v.span;
+    const c = { id: 'span', label: 'Width (widest point, wing-tip to wing-tip)', limit: L.span, limitText: 'less than 22 ft (6.71 m)', value: val, unit: 'm', src: useWidth ? src.width : src.span,
+      status: !isNum(val) ? 'unknown' : val >= L.span ? 'over' : val > L.span * 0.97 ? 'close' : 'ok', fixes: [],
+      note: `${useWidth ? 'Uses the overall width (wider than the wingspan you entered). ' : ''}${rs.spanConflict}` };
     if (c.status === 'unknown') c.fixes.push('Enter the wingspan (Design numbers step) or measure it from CAD.');
     if (c.status === 'over' || c.status === 'close') {
       const cut = val - L.span;
-      if (c.status === 'over') c.fixes.push(`Reduce the span by at least ${f2(cut)} m (${ft(cut)} ft) to ${f2(L.span)} m or less.`);
+      if (c.status === 'over') c.fixes.push(`Reduce the width by at least ${f2(cut)} m (${ft(cut)} ft) to under ${f2(L.span)} m (22 ft).`);
+      if (c.status === 'close') c.fixes.push(`Only ${((L.span - val) / 0.0254).toFixed(1)} in to spare. Fabric, hinges, fastener heads and tip parts can push it over — measure the finished craft at its widest point.`);
       if (isNum(v.wingArea)) {
         const chord = v.wingArea / L.span;
         const ar = L.span ** 2 / v.wingArea;
@@ -121,6 +128,23 @@ export function ruleChecks(d, ev, com) {
 }
 
 // ---------------------------------------------------------------------------
+// Parts-list scan for things the rules say no to (worded as "check", never as a ruling)
+// ---------------------------------------------------------------------------
+export function partsRuleWarnings(d) {
+  if (!rulesetOf(d)) return [];
+  const out = [];
+  const text = (c) => `${c.name || ''} ${c.material || ''} ${c.notes || ''} ${c.dims || ''}`;
+  // Whole words only, so e.g. "turnbuckles" is not mistaken for a buckle
+  const restraint = d.components.filter((c) => /\b(restraints?|restrain(ed|ing)?|harness(es)?|seat ?belts?|straps?|strapped|buckles?|[456]-point)\b/i.test(text(c)));
+  if (restraint.length) out.push({ level: 'bad', title: 'Pilot restraint in the parts list', detail: `"${restraint.map((c) => c.name).join('", "')}" looks like a restraint or harness. The Miami rules say: "The Pilot MUST NOT be strapped into the plane, or enclosed in any capsule or cockpit from which they can’t readily escape." Confirm in writing with the organisers before building it.` });
+  const foam = d.components.filter((c) => /\b(EPS|XPS)\b/.test(text(c)) || /styrofoam|polystyrene/i.test(text(c)));
+  if (foam.length) out.push({ level: 'warn', title: 'Polystyrene ("Styrofoam") in the parts list', detail: `"${foam.map((c) => c.name).join('", "')}" — Red Bull’s general Flugtag rules list Styrofoam as prohibited, and the Miami rules ask you to avoid materials that fragment or are hard to clear up. Closed-cell polyethylene (XLPE) is the usual alternative.` });
+  const motor = d.components.filter((c) => /motor|engine|battery|elastic|bungee|spring-loaded|catapult/i.test(text(c)));
+  if (motor.length) out.push({ level: 'warn', title: 'Check: possible stored or external energy', detail: `"${motor.map((c) => c.name).join('", "')}" — only human power is allowed (no motors, batteries or elastic bands). Make sure these parts don’t store or supply energy.` });
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Engineering suggestions: "the model doesn't seem good — what could we change?"
 // Each item: { title, detail, level: 'bad' | 'warn' | 'info', tab }
 // ---------------------------------------------------------------------------
@@ -164,7 +188,8 @@ export function engineeringFixes(d, ev, com) {
   const sm = stab.find((c) => c.id === 'sm');
   const np = stab.find((c) => c.id === 'xnp');
   if (isNum(sm.result) && sm.result < 5 && isNum(com.x) && isNum(np.result)) {
-    const targetX = np.result - 0.10 * v.chord; // 10% static margin as a target
+    const refC = isNum(v.macLength) ? v.macLength : v.chord;
+    const targetX = np.result - 0.10 * refC; // 10% static margin as a target
     const move = com.x - targetX;
     const pilotMove = isNum(v.pilotMass) && com.mass ? move * com.mass / v.pilotMass : NaN;
     out.push({ level: sm.result < 0 ? 'bad' : 'warn', title: `Centre of mass is ${sm.result < 0 ? 'behind' : 'close to'} the estimated neutral point (static margin ${sm.result.toFixed(0)}% of chord)`, tab: 'mass',

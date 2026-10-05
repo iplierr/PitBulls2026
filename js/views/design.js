@@ -12,7 +12,8 @@ import * as whatifTab from './whatif-tab.js';
 import * as calcTab from './calc-tab.js';
 import { nasaPanelHTML, bindNasaPanel, refreshNasaPanel } from './nasa-panel.js';
 import { rulesPanelHTML, bindRulesPanel } from './rules-panel.js';
-import { ruleChecks } from '../rules.js';
+import { airfoilPanelHTML, bindAirfoilPanel } from './airfoil-panel.js';
+import { ruleChecks, partsRuleWarnings } from '../rules.js';
 
 const overviewTab = { render: renderOverview, update: renderOverview };
 const inputsTab = { render: renderInputs, update: updateInputs };
@@ -318,6 +319,10 @@ const STATUS_TEXT = { ok: 'available', est: 'uses estimates', missing: 'missing'
 
 // The single most useful thing to do next, in plain words.
 function nextStep(d, ev, com, tests) {
+  const partWarn = partsRuleWarnings(d).find((w) => w.level === 'bad');
+  if (partWarn) {
+    return { title: partWarn.title, text: partWarn.detail, btn: '<button class="btn primary" data-scroll="rules-panel">See the rules check ↓</button>' };
+  }
   if (ev.missing.length) {
     const m = ev.missing[0];
     const assumable = assumableMissing(ev.missing);
@@ -450,6 +455,7 @@ function renderInputs(panel) {
           Need feet or pounds? Use <strong>⇄ Units</strong> at the top.</p>
         <form id="input-form" novalidate>${groupsHTML('inputs')}</form>
       </div>
+      ${airfoilPanelHTML(S.d)}
       </div>
       <aside class="panel section sticky-side" id="inputs-side"></aside>
     </div>`;
@@ -462,6 +468,7 @@ function renderInputs(panel) {
   }));
   bindMissingBlock(panel.querySelector('#inputs-side'));
   bindNasaPanel(panel.querySelector('.nasa-panel'), ctx);
+  bindAirfoilPanel(panel.querySelector('.airfoil-panel'), ctx);
   updateInputs(panel, ctx, null);
 }
 

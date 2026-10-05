@@ -42,6 +42,16 @@ Double-clicking `index.html` won't work, because browsers block JavaScript modul
 | **Report / export** | Printable report (Print → Save as PDF), simulation time series (CSV), inputs and results (CSV), design (JSON) |
 | **⇄ Units** | Converter for ft, in, lb, mph, knots, psi, °F … |
 
+## Tools for real design data
+
+- **Flying wings:** set "Type of craft" to *No horizontal tail* in Parts & balance. The neutral point is taken at 25% of the mean aerodynamic chord (MAC), and an MAC length field is available.
+- **Braced wings:** enter the stay/strut attachment point in Strength. The wing outside it is checked as a cantilever, with elliptical or uniform lift.
+- **Airfoil files:** load a coordinate file (Selig/Lednicer .dat/.txt, any chord length) in Design numbers. You get thickness, camber, zero-lift angle and Cm from thin-airfoil theory, and can use the zero-lift angle in the simulation.
+- **Parts from CSV:** Parts & balance → Import from CSV… reads mass ledgers (`part, mass_lb, x_ft, z_ft` …) and converts units and reference points.
+- **Rules scan:** the parts list is checked for a pilot restraint/harness or polystyrene and flagged against the Miami rules.
+- **Weather:** NASA weather has a "Miami — Bayfront Park (Flugtag 2026)" location.
+- **Team design file:** a team's design can be shared as a backup file (Dashboard → Import backup). Team data files are kept out of this public repository (`team-data/` is git-ignored).
+
 ## Fixing mistakes
 
 - **Undo / Redo** (top of every design, or Ctrl+Z / Ctrl+Y outside text boxes). This covers every change: inputs, parts, pocketing, CAD measurements, removing a model. The history is kept while the page stays open.
@@ -51,7 +61,7 @@ Double-clicking `index.html` won't work, because browsers block JavaScript modul
 
 ## Event rules
 
-The Overview tab checks the design against the **official Red Bull Flugtag Miami 2026 rules**, read from redbull.com on 2026-09-29: wingspan ≤ 28 ft, nose-to-tail ≤ 20 ft, craft + pilot ≤ 400 lb, and height with the pilot crouched ≤ 10 ft. It also gives a checklist for the rules you confirm yourselves (human power only, floats, no toxic materials, and so on).
+The Overview tab checks the design against the **official Red Bull Flugtag Miami 2026 rules**, read from redbull.com on 2026-09-29: width **less than 22 ft** (Miami FAQ; the rules page says 28 ft — the stricter value is used), nose-to-tail ≤ 20 ft, craft + pilot ≤ 400 lb, and height with the pilot crouched ≤ 10 ft. It also gives a checklist for the rules you confirm yourselves (human power only, floats, no toxic materials, and so on).
 
 The deck height is **not confirmed**: the rules page says 22 ft, but some Miami event listings say 30 ft. Ask the organisers. Rules can change, so re-check the page before the event.
 

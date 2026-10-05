@@ -93,9 +93,9 @@ export function designCalcs(ev) {
       note: 'Finite-wing approximation (Helmbold-type). Real airfoils differ a little.' }),
     isNum(r.v.knownCL)
       ? card({ id: 'CL', title: 'Lift coefficient used', what: 'How strongly the wing makes lift.', eq: 'CL (measured, entered)', inputs: [input(r, 'knownCL', 'CL')], compute: (x) => x, unit: '', src: r.src.knownCL })
-      : card({ id: 'CL', title: 'Lift coefficient (CL)', what: 'How strongly the wing makes lift at the chosen angle of attack.', eq: 'CL = a × α   (capped at CLmax)',
-        inputs: [input(r, 'AR', 'AR'), input(r, 'aoa', 'α'), input(r, 'clMax', 'CLmax')],
-        compute: (ar, al, cm) => { const cl = 2 * Math.PI * ar / (ar + 2) * al * DEG; return Math.abs(cl) > cm ? Math.sign(cl) * 0.6 * cm : cl; }, unit: '', note: aero?.stalled ? 'STALLED: α is past the stall angle; the model drops CL to 60% of CLmax.' : `Stall would start at about α = ${isNum(aero?.alphaStallDeg) ? aero.alphaStallDeg.toFixed(1) : '?'}°.` }),
+      : card({ id: 'CL', title: 'Lift coefficient (CL)', what: 'How strongly the wing makes lift at the chosen angle of attack.', eq: 'CL = a × (α − α0)   (capped at CLmax)',
+        inputs: [input(r, 'AR', 'AR'), input(r, 'aoa', 'α'), isNum(r.v.alphaL0) ? input(r, 'alphaL0', 'α0') : constant('α0', 'Zero-lift angle (not entered, so 0)', 0, '°'), input(r, 'clMax', 'CLmax')],
+        compute: (ar, al, a0, cm) => { const cl = 2 * Math.PI * ar / (ar + 2) * (al - a0) * DEG; return Math.abs(cl) > cm ? Math.sign(cl) * 0.6 * cm : cl; }, unit: '', note: aero?.stalled ? 'STALLED: α is past the stall angle; the model drops CL to 60% of CLmax.' : `Stall would start at about α = ${isNum(aero?.alphaStallDeg) ? aero.alphaStallDeg.toFixed(1) : '?'}°.` }),
     isNum(r.v.knownCD)
       ? card({ id: 'CD', title: 'Drag coefficient used', what: 'How much the craft resists moving through the air.', eq: 'CD (measured, entered)', inputs: [input(r, 'knownCD', 'CD')], compute: (x) => x, unit: '', src: r.src.knownCD })
       : card({ id: 'CD', title: 'Drag coefficient (CD)', what: 'How much the craft resists moving through the air: parasite drag plus drag caused by making lift.',
@@ -180,40 +180,60 @@ export const TAIL_VOLUME_REFERENCE = 'Typical values from Raymer, "Aircraft Desi
 export function stabilityCalcs(r, com) {
   const cgSrc = com.guessed ? 'estimated' : 'calculated';
   const cg = lit('x_cg', 'Centre of mass (from nose)', com.x, 'm', isNum(com.x) ? cgSrc : 'missing');
-  const aw = isNum(r.v.AR) ? 2 * Math.PI * r.v.AR / (r.v.AR + 2) : NaN;
-  const ct = isNum(r.v.tailArea) && isNum(r.v.tailSpan) ? r.v.tailArea / r.v.tailSpan : NaN;
-  const ARt = isNum(r.v.tailArea) && isNum(r.v.tailSpan) ? r.v.tailSpan ** 2 / r.v.tailArea : NaN;
-  const at = isNum(ARt) ? 2 * Math.PI * ARt / (ARt + 2) : NaN;
-  const xacw = r.v.wingLEx + 0.25 * r.v.chord;
-  const xact = r.v.tailLEx + 0.25 * ct;
-  const lt = xact - xacw;
-  const tailSrc = ['tailArea', 'tailSpan', 'tailLEx', 'wingLEx', 'chord'].some((id) => r.src[id] === 'estimated') ? 'estimated' : 'calculated';
+  // Reference chord: the mean aerodynamic chord if given, otherwise the average chord
+  const useMac = isNum(r.v.macLength);
+  const cId = useMac ? 'macLength' : 'chord';
+  const C = r.v[cId];
+  const cIn = () => input(r, cId, useMac ? 'MAC' : 'c');
+  const cName = useMac ? 'MAC' : 'chord';
+  const tailless = r.v.tailType === 'none';
 
   const cards = [
-    card({ id: 'cgChord', title: 'Centre of mass position on the wing', what: 'Where the CoM sits along the wing chord, as a % from the leading edge. Gliders usually balance somewhere in the front third of the chord.',
-      eq: '(x_cg − x_LE) ÷ c × 100%', inputs: [cg, input(r, 'wingLEx', 'x_LE'), input(r, 'chord', 'c')], compute: (x, le, c) => (x - le) / c * 100, unit: '% chord', digits: 3 }),
+    card({ id: 'cgChord', title: `Centre of mass position on the wing (% ${cName})`, what: 'Where the CoM sits along the wing chord, as a % from the leading edge. Gliders usually balance somewhere in the front third of the chord.',
+      eq: `(x_cg − x_LE) ÷ ${useMac ? 'MAC' : 'c'} × 100%`, inputs: [cg, input(r, 'wingLEx', 'x_LE'), cIn()], compute: (x, le, c) => (x - le) / c * 100, unit: `% ${cName}`, digits: 3 }),
     card({ id: 'xacw', title: 'Wing aerodynamic centre', what: 'Point on the wing where lift effectively acts without changing pitch moment with angle — about ¼ of the chord back from the leading edge.',
-      eq: 'x_ac,w = x_LE + 0.25 × c', inputs: [input(r, 'wingLEx', 'x_LE'), input(r, 'chord', 'c')], compute: (le, c) => le + 0.25 * c, unit: 'm from nose',
-      note: 'Uses the mean chord; for tapered or swept wings use the leading edge of the mean aerodynamic chord.' }),
-    card({ id: 'VH', title: 'Horizontal tail volume coefficient', what: 'Size of the tail × its lever arm, compared with the wing. Bigger = more pitch "weathervane" effect.',
-      eq: 'V_H = S_t × l_t ÷ (S × c)', inputs: [input(r, 'tailArea', 'S_t'), lit('l_t', 'Wing AC to tail AC distance', lt, 'm', tailSrc), input(r, 'wingArea', 'S'), input(r, 'chord', 'c')],
-      compute: (st, l, s, c) => st * l / (s * c), unit: '', digits: 3, note: TAIL_VOLUME_REFERENCE }),
+      eq: `x_ac,w = x_LE + 0.25 × ${useMac ? 'MAC' : 'c'}`, inputs: [input(r, 'wingLEx', 'x_LE'), cIn()], compute: (le, c) => le + 0.25 * c, unit: 'm from nose',
+      note: useMac ? 'Uses the mean aerodynamic chord you entered.' : 'Uses the average chord; for tapered or swept wings enter the MAC and its leading-edge position for a better estimate.' }),
   ];
-  const npInputs = [input(r, 'wingLEx', 'x_LE'), input(r, 'chord', 'c'), lit('V_H', 'Tail volume coefficient', r.v.tailArea * lt / (r.v.wingArea * r.v.chord), '', tailSrc),
-    input(r, 'tailEff', 'η'), lit('a_t', 'Tail lift slope', at, '/rad', tailSrc), lit('a_w', 'Wing lift slope', aw, '/rad', r.src.AR || 'missing'), input(r, 'AR', 'AR')];
-  const np = card({ id: 'xnp', title: 'Estimated neutral point', what: 'If the centre of mass is behind this point, the simplified model predicts the craft will not naturally return to its pitch attitude after a disturbance.',
-    eq: 'x_np = x_ac,w + c × η × V_H × (a_t ÷ a_w) × (1 − dε/dα),   dε/dα = 2a_w ÷ (π AR)',
-    inputs: npInputs, compute: (le, c, vh, eta, a_t, a_w, ar) => le + 0.25 * c + c * eta * vh * (a_t / a_w) * (1 - 2 * a_w / (Math.PI * ar)), unit: 'm from nose', digits: 3,
-    note: 'Classical textbook estimate. Ignores fuselage and pilot body effects, which usually move the neutral point forward (less stable).' });
-  cards.push(np);
-  cards.push(card({ id: 'sm', title: 'Static margin', what: 'Distance from the centre of mass to the neutral point, as a fraction of chord. Positive = CoM ahead of the neutral point.',
-    eq: 'SM = (x_np − x_cg) ÷ c', inputs: [lit('x_np', 'Neutral point (needs the inputs listed in the card above)', np.result, 'm', np.src), cg, input(r, 'chord', 'c')],
-    compute: (n, x, c) => (n - x) / c * 100, unit: '% chord', digits: 3,
-    note: 'Many conventional aircraft are designed with a static margin of roughly 5–15% chord. A positive number here does NOT prove your craft is stable: the pilot moving, flexible structure and fuselage effects are not modelled.' }));
-  const lv = r.v.vtailLEx - com.x;
-  cards.push(card({ id: 'VV', title: 'Vertical tail volume coefficient', what: 'Size of the fin × its lever arm, compared with the wing. Helps the craft point into the airflow (yaw).',
-    eq: 'V_V = S_v × l_v ÷ (S × b)', inputs: [input(r, 'vtailArea', 'S_v'), lit('l_v', 'CoM to fin leading edge', lv, 'm', isNum(lv) ? cgSrc : 'missing'), input(r, 'wingArea', 'S'), input(r, 'span', 'b')],
-    compute: (sv, l, s, b) => sv * l / (s * b), unit: '', digits: 3, note: 'Uses the distance to the fin leading edge, so it slightly underestimates the true lever arm. ' + TAIL_VOLUME_REFERENCE }));
+
+  let np;
+  if (tailless) {
+    // Flying wing: the neutral point is approximately the wing's own aerodynamic centre.
+    np = card({ id: 'xnp', title: 'Estimated neutral point (flying wing)', what: 'Without a horizontal tail, the neutral point is roughly the wing’s aerodynamic centre. The centre of mass must be ahead of it.',
+      eq: `x_np ≈ x_ac,w = x_LE + 0.25 × ${useMac ? 'MAC' : 'c'}`, inputs: [input(r, 'wingLEx', 'x_LE'), cIn()], compute: (le, c) => le + 0.25 * c, unit: 'm from nose', digits: 3,
+      src: 'estimated',
+      note: 'Assumption: neutral point at 25% of the MAC (the same screening assumption as a typical design report). Sweep, washout, the pilot’s body, the pilot frame and the downturned tips all move the real neutral point. Treat as a first estimate until tested.' });
+    cards.push(np);
+  } else {
+    const aw = isNum(r.v.AR) ? 2 * Math.PI * r.v.AR / (r.v.AR + 2) : NaN;
+    const ct = isNum(r.v.tailArea) && isNum(r.v.tailSpan) ? r.v.tailArea / r.v.tailSpan : NaN;
+    const ARt = isNum(r.v.tailArea) && isNum(r.v.tailSpan) ? r.v.tailSpan ** 2 / r.v.tailArea : NaN;
+    const at = isNum(ARt) ? 2 * Math.PI * ARt / (ARt + 2) : NaN;
+    const xacw = r.v.wingLEx + 0.25 * C;
+    const xact = r.v.tailLEx + 0.25 * ct;
+    const lt = xact - xacw;
+    const tailSrc = ['tailArea', 'tailSpan', 'tailLEx', 'wingLEx', cId].some((id) => r.src[id] === 'estimated') ? 'estimated' : 'calculated';
+    cards.push(card({ id: 'VH', title: 'Horizontal tail volume coefficient', what: 'Size of the tail × its lever arm, compared with the wing. Bigger = more pitch "weathervane" effect.',
+      eq: 'V_H = S_t × l_t ÷ (S × c)', inputs: [input(r, 'tailArea', 'S_t'), lit('l_t', 'Wing AC to tail AC distance', lt, 'm', tailSrc), input(r, 'wingArea', 'S'), cIn()],
+      compute: (st, l, s2, c) => st * l / (s2 * c), unit: '', digits: 3, note: TAIL_VOLUME_REFERENCE }));
+    const npInputs = [input(r, 'wingLEx', 'x_LE'), cIn(), lit('V_H', 'Tail volume coefficient', r.v.tailArea * lt / (r.v.wingArea * C), '', tailSrc),
+      input(r, 'tailEff', 'η'), lit('a_t', 'Tail lift slope', at, '/rad', tailSrc), lit('a_w', 'Wing lift slope', aw, '/rad', r.src.AR || 'missing'), input(r, 'AR', 'AR')];
+    np = card({ id: 'xnp', title: 'Estimated neutral point', what: 'If the centre of mass is behind this point, the simplified model predicts the craft will not naturally return to its pitch attitude after a disturbance.',
+      eq: 'x_np = x_ac,w + c × η × V_H × (a_t ÷ a_w) × (1 − dε/dα),   dε/dα = 2a_w ÷ (π AR)',
+      inputs: npInputs, compute: (le, c, vh, eta, a_t, a_w, ar) => le + 0.25 * c + c * eta * vh * (a_t / a_w) * (1 - 2 * a_w / (Math.PI * ar)), unit: 'm from nose', digits: 3,
+      note: 'Classical textbook estimate. Ignores fuselage and pilot body effects, which usually move the neutral point forward (less stable). If your craft has no horizontal tail, set "Type of craft" to flying wing.' });
+    cards.push(np);
+  }
+  cards.push(card({ id: 'sm', title: 'Static margin', what: `Distance from the centre of mass to the neutral point, as a % of the ${cName}. Positive = CoM ahead of the neutral point.`,
+    eq: `SM = (x_np − x_cg) ÷ ${useMac ? 'MAC' : 'c'}`, inputs: [lit('x_np', 'Neutral point (needs the inputs listed in the card above)', np.result, 'm', np.src), cg, cIn()],
+    compute: (n, x, c) => (n - x) / c * 100, unit: `% ${cName}`, digits: 3,
+    note: 'Many conventional aircraft are designed with a static margin of roughly 5–15% chord. A positive number here does NOT prove your craft is stable: the pilot moving, flexible structure and body effects are not modelled.' }));
+  if (!tailless) {
+    const lv = r.v.vtailLEx - com.x;
+    cards.push(card({ id: 'VV', title: 'Vertical tail volume coefficient', what: 'Size of the fin × its lever arm, compared with the wing. Helps the craft point into the airflow (yaw).',
+      eq: 'V_V = S_v × l_v ÷ (S × b)', inputs: [input(r, 'vtailArea', 'S_v'), lit('l_v', 'CoM to fin leading edge', lv, 'm', isNum(lv) ? cgSrc : 'missing'), input(r, 'wingArea', 'S'), input(r, 'span', 'b')],
+      compute: (sv, l, s2, b) => sv * l / (s2 * b), unit: '', digits: 3, note: 'Uses the distance to the fin leading edge, so it slightly underestimates the true lever arm. ' + TAIL_VOLUME_REFERENCE }));
+  }
   return cards;
 }
 
@@ -231,25 +251,56 @@ export function sectionProperties(v) {
   }
 }
 
+// Load and bending moment of the wing between station a (m from centreline) and the tip s.
+// Elliptical: w(y) = w0·√(1−(y/s)²) with ∫0..s w = F.  Uniform: w = F/s.
+export function outerBay(F, s, a, uniform) {
+  if (!(F > 0 && s > 0) || !(a >= 0 && a < s)) return { Fout: NaN, M: NaN };
+  if (uniform) { const w = F / s; return { Fout: w * (s - a), M: w * (s - a) ** 2 / 2 }; }
+  const w0 = 4 * F / (Math.PI * s);
+  const N = 400, h = (s - a) / N;
+  let Fo = 0, Mo = 0;
+  for (let i = 0; i <= N; i++) {
+    const y = a + i * h;
+    const wy = w0 * Math.sqrt(Math.max(0, 1 - (y / s) ** 2));
+    const k = i === 0 || i === N ? 1 : i % 2 ? 4 : 2; // Simpson's rule
+    Fo += k * wy;
+    Mo += k * wy * (y - a);
+  }
+  return { Fout: Fo * h / 3, M: Mo * h / 3 };
+}
+
 export function structureCalcs(r, analysis) {
   const v = r.v;
   const sec = sectionProperties(v);
   const secSrc = ['sparH', 'sparW', 'sparWall'].some((id) => r.src[id] === 'estimated') ? 'estimated' : 'entered';
   const Ival = sec && [sec.I].every(isNum) ? sec.I : NaN;
   const halfSpan = v.span / 2;
-  const ybar = 4 * halfSpan / (3 * Math.PI);
-  const loadSrc = ['loadFactor', 'totalMass', 'span'].some((id) => r.src[id] === 'estimated') ? 'estimated' : 'calculated';
+  const loadSrc = ['loadFactor', 'totalMass', 'span', 'braceStation'].some((id) => r.src[id] === 'estimated') ? 'estimated' : 'calculated';
   const Fhalf = v.loadFactor * v.weight / 2;
-  const M = Fhalf * ybar;
+  // Braced wing: only the part outside the stays/struts is checked as a cantilever.
+  const braced = isNum(v.braceStation) && v.braceStation > 0 && v.braceStation < halfSpan;
+  const a = braced ? v.braceStation : 0;
+  const uniform = v.liftDist === 'uniform';
+  const outer = outerBay(Fhalf, halfSpan, a, uniform);
+  const M = outer.M;
+  const distText = uniform ? 'uniform lift along the span' : 'elliptical lift distribution';
   const shapeNote = !v.sparShape ? 'Choose a spar cross-section.' : (!sec ? 'Wall thickness must be less than half the outer size.' : '');
 
   const cards = [
     card({ id: 'Fwing', title: 'Load carried by each half-wing', what: 'Lift each wing half must carry at the design load factor.', eq: 'F = n × W ÷ 2',
       inputs: [input(r, 'loadFactor', 'n'), input(r, 'weight', 'W')], compute: (n, w) => n * w / 2, unit: 'N', digits: 4,
       note: 'Conservative: uses the whole weight, ignoring that the wing\'s own weight partly cancels its lift.' }),
-    card({ id: 'Mroot', title: 'Bending moment at the wing root', what: 'How hard the lift tries to bend the wing upward where it joins the body. This is usually the most loaded point.',
-      eq: 'M = F × 4(b/2) ÷ (3π)', inputs: [lit('F', 'Half-wing load', Fhalf, 'N', loadSrc), input(r, 'span', 'b')], compute: (F, b) => F * 4 * (b / 2) / (3 * Math.PI), unit: 'N·m', digits: 4,
-      note: 'Assumes elliptical lift distribution along the span (lift centroid at 4(b/2)/3π from the root) and a cantilever wing (no struts or wires).' }),
+    ...(braced ? [card({ id: 'Fout', title: 'Load on the wing outside the bracing point', what: 'The part of the half-wing load carried by the wing beyond the stays/struts.',
+      eq: 'F_out = ∫ w(y) dy  from the bracing point to the tip', inputs: [lit('F', 'Half-wing load', Fhalf, 'N', loadSrc), input(r, 'span', 'b'), input(r, 'braceStation', 'a')],
+      compute: () => outer.Fout, unit: 'N', digits: 4, note: `Uses ${distText}.` })] : []),
+    card({ id: 'Mroot', title: braced ? 'Bending moment at the bracing point' : 'Bending moment at the wing root',
+      what: braced ? 'How hard the lift on the outer wing tries to bend the spar where the stays/struts attach.' : 'How hard the lift tries to bend the wing upward where it joins the body. This is usually the most loaded point.',
+      eq: braced ? 'M = ∫ w(y) × (y − a) dy  from a to b/2' : (uniform ? 'M = F × (b/2) ÷ 2' : 'M = F × 4(b/2) ÷ (3π)'),
+      inputs: [lit('F', 'Half-wing load', Fhalf, 'N', loadSrc), input(r, 'span', 'b'), ...(braced ? [input(r, 'braceStation', 'a')] : [])],
+      compute: () => M, unit: 'N·m', digits: 4,
+      note: braced
+        ? `Treats the wing outside the bracing point as a cantilever, with ${distText}. The inner wing, the stays/struts, their end fittings and the centre joint carry the rest of the load and are NOT checked here — they are often the parts that fail first.`
+        : `Assumes ${distText} and a cantilever wing (no struts or wires). If your wing has stays or struts, enter the bracing point.` }),
     card({ id: 'I', title: 'Second moment of area of one spar', what: 'How well the spar\'s shape resists bending. Taller sections resist far better.',
       eq: { roundTube: 'I = π(D⁴ − (D−2t)⁴) ÷ 64', rectTube: 'I = (B·H³ − (B−2t)(H−2t)³) ÷ 12', roundSolid: 'I = π·D⁴ ÷ 64', rectSolid: 'I = B·H³ ÷ 12' }[v.sparShape] || 'depends on cross-section',
       inputs: [lit('shape', 'Spar cross-section', v.sparShape ? 1 : NaN, '', 'entered'), ...(sec?.needs || ['sparH']).map((id) => input(r, id, { sparH: 'H', sparW: 'B', sparWall: 't' }[id]))],
@@ -258,15 +309,19 @@ export function structureCalcs(r, analysis) {
       inputs: [lit('M', 'Root bending moment', M, 'N·m', loadSrc), lit('c', 'Distance to outer fibre', sec ? sec.c : NaN, 'm', secSrc), lit('I', 'Second moment of area', Ival, 'm⁴', secSrc), input(r, 'sparCount', 'N')],
       compute: (m, c, I, n) => m * c / (I * n) / 1e6, unit: 'MPa', digits: 3, note: 'Assumes the spars share the load equally and the skin/ribs carry no bending.' }),
   ];
-  const sigma = cards[3].result;
+  // Look the stress card up by id (card positions change when a braced wing adds a card)
+  const stressCard = cards.find((c) => c.id === 'stress');
+  const sigma = stressCard.result;
   cards.push(card({ id: 'strain', title: 'Strain at the root', what: 'How much the material stretches (as a fraction of its length).', eq: 'ε = σ ÷ E',
-    inputs: [lit('σ', 'Bending stress', sigma, 'MPa', cards[3].src), input(r, 'youngsModulus', 'E')], compute: (s, E) => s / (E * 1000), unit: '', digits: 3 }));
+    inputs: [lit('σ', 'Bending stress', sigma, 'MPa', stressCard.src), input(r, 'youngsModulus', 'E')], compute: (s, E) => s / (E * 1000), unit: '', digits: 3 }));
   cards.push(card({ id: 'fos', title: 'Factor of safety (bending, root)', what: 'Material strength ÷ calculated stress. 1.0 means it would just reach its limit at the design load.', eq: 'FoS = σ_strength ÷ σ',
-    inputs: [input(r, 'yieldStrength', 'σ_strength'), lit('σ', 'Bending stress', sigma, 'MPa', cards[3].src)], compute: (y, s) => y / s, unit: '', digits: 3,
+    inputs: [input(r, 'yieldStrength', 'σ_strength'), lit('σ', 'Bending stress', sigma, 'MPa', stressCard.src)], compute: (y, s) => y / s, unit: '', digits: 3,
     note: 'Only as good as the strength value you entered. Does not include joints, bolt holes, buckling of thin walls, glue lines or fatigue — these often fail first.' }));
-  cards.push(card({ id: 'defl', title: 'Approximate wing-tip deflection', what: 'How far the tip bends up at the design load.', eq: 'δ ≈ w × L⁴ ÷ (8 × E × I × N),  w = F ÷ L,  L = b/2',
-    inputs: [lit('F', 'Half-wing load', Fhalf, 'N', loadSrc), input(r, 'span', 'b'), input(r, 'youngsModulus', 'E', 1e9, 'Pa'), lit('I', 'Second moment of area', Ival, 'm⁴', secSrc), input(r, 'sparCount', 'N')],
-    compute: (F, b, E, I, n) => (F / (b / 2)) * (b / 2) ** 4 / (8 * E * I * n), unit: 'm', digits: 3, note: 'Uniform-load cantilever approximation with a constant spar section.' }));
+  cards.push(card({ id: 'defl', title: braced ? 'Approximate tip deflection of the outer wing' : 'Approximate wing-tip deflection', what: 'How far the tip bends up at the design load.',
+    eq: 'δ ≈ w × L⁴ ÷ (8 × E × I × N),  w = F_out ÷ L,  L = length outside the support',
+    inputs: [lit('F_out', braced ? 'Load outside the bracing point' : 'Half-wing load', outer.Fout, 'N', loadSrc), lit('L', braced ? 'Outer wing length' : 'Half-span', halfSpan - a, 'm', loadSrc), input(r, 'youngsModulus', 'E', 1e9, 'Pa'), lit('I', 'Second moment of area', Ival, 'm⁴', secSrc), input(r, 'sparCount', 'N')],
+    compute: (F, L, E, I, n) => (F / L) * L ** 4 / (8 * E * I * n), unit: 'm', digits: 3,
+    note: `Uniform-load cantilever approximation with a constant spar section${braced ? ', measured from the bracing point (stretch of the stays is ignored)' : ''}.` }));
 
   const f = analysis?.flight;
   const vImp = f ? f.impactSpeed : NaN;

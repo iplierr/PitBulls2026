@@ -313,7 +313,7 @@ function renderAnalysis() {
       <div class="table-wrap"><table class="list-table"><thead><tr><th></th><th>Value</th><th>Measured</th><th>Currently in design</th><th>How it was measured</th></tr></thead><tbody>
         ${meas.map((x) => {
           const cur = d.values[x.id];
-          return `<tr><td><input type="checkbox" data-meas="${x.id}" ${x.id === 'width' || x.id === 'length' || x.id === 'height' || x.id === 'span' || roles && Object.keys(roles).length ? 'checked' : ''}></td>
+          return `<tr><td><input type="checkbox" data-meas="${x.id}" ${cur === undefined || cur === null || d.source[x.id] === 'measured' ? 'checked' : ''}></td>
             <td>${esc(FIELD[x.id].label)}</td><td class="num">${sig(x.value, 4)} ${esc(FIELD[x.id].unit)}</td>
             <td class="num">${isNum(cur) ? `${sig(cur, 4)} ${badge(d.source[x.id])}` : '<span class="muted">not provided</span>'}</td>
             <td class="small muted">${esc(x.how)}</td></tr>`;

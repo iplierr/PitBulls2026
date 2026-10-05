@@ -21,7 +21,9 @@ export function aeroCoefficients(p) {
   const S = p.wingArea;
   const AR = (p.span * p.span) / S;
   const clAlpha = (2 * Math.PI * AR) / (AR + 2); // per radian
-  const alphaStallDeg = num(p.clMax) ? p.clMax / clAlpha / DEG : NaN;
+  // Zero-lift angle of a cambered airfoil (0 if not given: angle of attack is then measured from zero lift)
+  const a0 = num(p.alphaL0) ? p.alphaL0 : 0;
+  const alphaStallDeg = num(p.clMax) ? p.clMax / clAlpha / DEG + a0 : NaN;
   const k = num(p.oswald) ? 1 / (Math.PI * p.oswald * AR) : NaN;
 
   let CL;
@@ -32,7 +34,7 @@ export function aeroCoefficients(p) {
     stalled = num(p.clMax) && Math.abs(CL) > p.clMax;
     clSource = 'known';
   } else {
-    const alpha = p.aoa * DEG;
+    const alpha = (p.aoa - a0) * DEG;
     CL = clAlpha * alpha;
     clSource = 'aoa';
     if (num(p.clMax) && Math.abs(CL) > p.clMax) {

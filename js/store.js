@@ -219,6 +219,11 @@ export function importJSON(text) {
       if (i >= 0) list[i] = item; else list.push(item);
     }
   };
+  // A new design whose version number is already used here gets the next free number
+  for (const d of data.designs) {
+    if (!d || db.designs.some((x) => x.id === d.id)) continue;
+    if (db.designs.some((x) => String(x.label) === String(d.label))) d.label = nextMajorLabel();
+  }
   merge(db.designs, data.designs);
   merge(db.tests, data.tests);
   merge(db.notes, data.notes);

@@ -2,6 +2,7 @@
 import { uid } from '../store.js';
 import { componentMass, partMassSource, pocketRemoval, pocketVolume, withoutPocketing, hasPocketing, evaluate, centerOfMass } from '../model.js';
 import { FIELD } from '../fields.js';
+import { openPartsImport } from './parts-import.js';
 import { stabilityCalcs } from '../calcs.js';
 import { esc, fmt, sig, badge, calcCardHTML, groupsHTML, refreshFields, bindFields } from '../ui.js';
 
@@ -17,6 +18,7 @@ export function render(panel, ctx) {
         <div class="row-actions">
           <button class="btn small" id="add-part" type="button">+ Add part</button>
           <button class="btn small" id="add-typical" type="button" title="Adds empty rows with typical Flugtag part names — no masses are filled in">+ Add typical part list</button>
+          <button class="btn small" id="import-parts" type="button" title="Import a mass ledger / parts list saved as CSV">⇪ Import from CSV…</button>
         </div>
       </div>
       <p class="hint">List every part with its mass. Positions are measured <strong>from the nose</strong> (backwards) and <strong>from the lowest point</strong> (upwards), in metres.
@@ -81,6 +83,11 @@ export function render(panel, ctx) {
     ctx.changed(null);
     panel.querySelector('#parts-table tbody tr:last-child input')?.focus();
   });
+  panel.querySelector('#import-parts').addEventListener('click', () => openPartsImport(ctx, () => {
+    renderTable(panel, ctx);
+    renderLW(panel, ctx);
+    ctx.changed(null);
+  }));
   panel.querySelector('#add-typical').addEventListener('click', () => {
     for (const [n, c] of [['Frame', 'Frame'], ['Main wing', 'Main wing'], ['Tail', 'Tail'], ['Landing structure', 'Landing structure'], ['Decorations', 'Decorations'], ['Electronics', 'Electronics'], ['Other', 'Other']]) {
       if (!ctx.d.components.some((x) => x.name === n)) add(n, c);
@@ -349,7 +356,7 @@ function comHTML({ com, ev }) {
     ${eq}
     <p class="hint">Uses ${com.items.length} items totalling ${fmt(com.mass, 1)} kg (parts + pilot). ${problems.length ? 'Note: ' + problems.join('; ') + '.' : ''}
       ${com.partsIncomplete ? '<strong>Warning:</strong> the parts do not add up to the craft mass typed on the Design numbers step, so some mass is missing from this calculation.' : ''}
-      ${isNum(ev.r.v.wingLEx) && isNum(ev.r.v.chord) ? `The CoM is at <strong>${fmt((com.x - ev.r.v.wingLEx) / ev.r.v.chord * 100, 0)}%</strong> of the wing chord from its leading edge.` : ''}</p>`;
+      ${isNum(ev.r.v.wingLEx) && isNum(ev.r.v.macLength ?? ev.r.v.chord) ? `The CoM is at <strong>${fmt((com.x - ev.r.v.wingLEx) / (ev.r.v.macLength ?? ev.r.v.chord) * 100, 1)}%</strong> of the ${isNum(ev.r.v.macLength) ? 'mean aerodynamic chord (MAC)' : 'wing chord'} from its leading edge.` : ''}</p>`;
 }
 
 // Simple side-view diagram (SVG): wing, tail, parts, pilot, centre of mass.

@@ -34,6 +34,7 @@ export function bindNasaPanel(root, ctx) {
   place.addEventListener('change', () => {
     const p = PRESETS.find((x) => x.id === place.value);
     if (isNum(p.lat)) { $('#nasa-lat').value = p.lat; $('#nasa-lon').value = p.lon; }
+    if (p.date && !$('#nasa-date').value) $('#nasa-date').value = p.date;
     if (p.id === 'here') {
       if (!navigator.geolocation) { status('This browser cannot share its location.', 'error'); return; }
       status('Asking the browser for your location…');

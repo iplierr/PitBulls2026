@@ -9,6 +9,7 @@ const LATENCY_DAYS = 10; // hourly data usually appears within a few days; stay 
 export const PRESETS = [
   { id: 'custom', label: 'Custom coordinates…' },
   { id: 'here', label: 'This device\'s location' },
+  { id: 'miami2026', label: 'Miami — Bayfront Park (Flugtag 2026)', lat: 25.7764, lon: -80.1846, date: '2026-10-31' },
   { id: 'longbeach', label: 'Long Beach, CA', lat: 33.77, lon: -118.19 },
   { id: 'chicago', label: 'Chicago, IL', lat: 41.88, lon: -87.63 },
   { id: 'miami', label: 'Miami, FL', lat: 25.76, lon: -80.19 },

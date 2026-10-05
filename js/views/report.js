@@ -4,7 +4,7 @@ import { FIELDS, FIELD } from '../fields.js';
 import { evaluate, centerOfMass, sanityChecks, componentMass, partMassSource, pocketRemoval, SOURCE_LABEL } from '../model.js';
 import { designCalcs, stabilityCalcs, structureCalcs, simulationSource } from '../calcs.js';
 import { explain, sensitivity } from '../explain.js';
-import { rulesetOf, ruleChecks, engineeringFixes } from '../rules.js';
+import { rulesetOf, ruleChecks, engineeringFixes, partsRuleWarnings } from '../rules.js';
 import { TrajectoryView } from '../trajectory.js';
 import { lineChart } from '../charts.js';
 import { simFor } from './tests.js';
@@ -80,6 +80,7 @@ export function show(el, app, { id }) {
           ${cks.map((c) => `<tr><td>${esc(c.label)}</td><td>${esc(c.limitText)}</td><td class="num">${isNum(c.value) ? c.value.toFixed(2) + ' ' + c.unit : 'not provided'}</td>
             <td>${{ ok: 'within limit', close: 'within 3% of limit', over: 'OVER', unknown: 'cannot check' }[c.status]}${c.fixes.length && c.status !== 'unknown' ? '<br><small>' + c.fixes.map(esc).join('<br>') + '</small>' : ''}</td></tr>`).join('')}
           </tbody></table>
+          ${partsRuleWarnings(d).map((w) => `<p class="small"><strong>${esc(w.title)}:</strong> ${esc(w.detail)}</p>`).join('')}
           <p class="small">Team-confirmed rules: ${rs.manual.filter(([id]) => done[id]).length} of ${rs.manual.length}. Not confirmed: ${rs.manual.filter(([id]) => !done[id]).map(([, t]) => esc(t)).join(' · ') || 'none'}.</p>
           <h3>What could we fix?</h3><ul>${engineeringFixes(d, ev, com).map((f) => `<li><strong>${esc(f.title)}</strong> — ${esc(f.detail)}</li>`).join('')}</ul>`;
       })()}

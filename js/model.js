@@ -171,7 +171,7 @@ export function simulationMissing(r) {
 export function simParams(r) {
   const v = r.v;
   return {
-    mass: v.totalMass, wingArea: v.wingArea, span: v.span, aoa: v.aoa, clMax: v.clMax, cd0: v.cd0,
+    mass: v.totalMass, wingArea: v.wingArea, span: v.span, aoa: v.aoa, alphaL0: v.alphaL0, clMax: v.clMax, cd0: v.cd0,
     oswald: v.oswald, knownCL: v.knownCL, knownCD: v.knownCD, airDensity: v.airDensity, headwind: v.headwind,
     launchSpeed: v.launchSpeed, launchAngle: v.launchAngle, deckHeight: v.deckHeight,
   };
@@ -309,7 +309,9 @@ export function completeness(d, r, ev, com, tests) {
     { label: 'Drag data (CD0, e — or measured CD)', status: isNum(v.knownCD) ? st(['knownCD']) : st(['cd0', 'oswald']), detail: '', go: 'inputs', field: 'cd0' },
     { label: 'Parts / mass breakdown', status: d.components.length ? (d.components.some((c) => c.massSource === 'estimated') ? 'est' : 'ok') : 'missing', detail: `${d.components.length} part(s)`, go: 'mass' },
     { label: 'Centre of mass', status: isNum(com.x) ? (com.guessed ? 'est' : 'ok') : 'missing', detail: isNum(com.x) ? `${com.x.toFixed(2)} m from nose` : 'needs part positions and pilot position', go: 'mass' },
-    { label: 'Tail geometry (for stability check)', status: st(['wingLEx', 'tailArea', 'tailSpan', 'tailLEx']), detail: '', go: 'mass' },
+    v.tailType === 'none'
+      ? { label: 'Wing position (flying wing — for the balance check)', status: st(['wingLEx']), detail: 'no horizontal tail', go: 'mass' }
+      : { label: 'Tail geometry (for stability check)', status: st(['wingLEx', 'tailArea', 'tailSpan', 'tailLEx']), detail: v.tailType ? '' : 'or set "Type of craft" to flying wing', go: 'mass' },
     { label: 'Spar & material (for structure check)', status: st(['sparH', 'yieldStrength']), detail: '', go: 'structure' },
     { label: 'Physical tests recorded', status: tests.length ? 'ok' : 'missing', detail: `${tests.length} test(s)`, go: 'tests' },
   ];

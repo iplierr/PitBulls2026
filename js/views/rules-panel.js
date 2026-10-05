@@ -1,5 +1,5 @@
 // Overview panel: event rules check (Miami 2026) + "what could we fix?" engineering suggestions.
-import { RULESETS, DEFAULT_RULESET, rulesetOf, ruleChecks, engineeringFixes } from '../rules.js';
+import { RULESETS, DEFAULT_RULESET, rulesetOf, ruleChecks, engineeringFixes, partsRuleWarnings } from '../rules.js';
 import { esc, badge, toast } from '../ui.js';
 
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -22,7 +22,9 @@ export function rulesPanelHTML(d, ev, com) {
     const deckVal = ev.r.v.deckHeight;
     rules = `
       <p class="hint">${esc(rs.event)} · Official rule: <em>"${esc(rs.quote)}"</em>
-        <a href="${rs.source}" target="_blank" rel="noopener">Rules page</a> (read ${rs.checked}). Rules can change — check the page before the event.</p>
+        <a href="${rs.source}" target="_blank" rel="noopener">Rules page</a> (read ${rs.checked}).
+        FAQ page: <em>"${esc(rs.faqQuote)}"</em> <a href="${rs.faqSource}" target="_blank" rel="noopener">FAQ</a>. Rules can change — check both pages before the event.</p>
+      ${partsRuleWarnings(d).map((w) => `<div class="verdict ${w.level}"><strong>${esc(w.title)}.</strong> ${esc(w.detail)}</div>`).join('')}
       <div class="verdict ${over ? 'bad' : unknown ? 'warn' : 'good'}">
         ${over ? `<strong>${over} size/weight rule${over > 1 ? 's are' : ' is'} not met.</strong> Suggested fixes are listed below.`
           : unknown ? `No rule broken so far, but ${unknown} can't be checked yet — some measurements are missing.`
