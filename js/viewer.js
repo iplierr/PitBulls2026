@@ -40,7 +40,8 @@ export class Viewer {
     this.scene.add(sun);
 
     // 1 m grid squares: a quick visual check that units are right.
-    this.scene.add(new THREE.GridHelper(30, 30, 0x8d99ab, 0xc9d1dd));
+    this.grid = new THREE.GridHelper(30, 30, 0x8d99ab, 0xc9d1dd);
+    this.scene.add(this.grid);
 
     this.cad = new THREE.Group();
     this.placeholder = new THREE.Group();
@@ -233,6 +234,62 @@ export class Viewer {
       this.markers.add(mesh);
     }
     this.render();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Flight view: water, the launch deck, and the craft moved along the simulated path.
+  // Flight x (forward) maps to world −Z (the model's nose points to −Z); height maps to world Y.
+  // ---------------------------------------------------------------------------
+  enterFlight(deckHeight) {
+    if (!this.flight) {
+      const water = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshStandardMaterial({ color: 0x3b86c9, roughness: 0.35 }));
+      water.rotation.x = -Math.PI / 2;
+      water.position.z = -150;
+      const deck = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0x8b6b4a, roughness: 0.8 }));
+      const edge = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xf2c94c, roughness: 0.6 }));
+      const group = new THREE.Group();
+      group.add(water, deck, edge);
+      this.scene.add(group);
+      this.flight = { group, deck, edge };
+    }
+    const h = Math.max(deckHeight, 0.5);
+    this.flight.deck.scale.set(9, h, 16);
+    this.flight.deck.position.set(0, h / 2, 8);
+    this.flight.edge.scale.set(9, 0.06, 0.25);
+    this.flight.edge.position.set(0, h + 0.03, 0.12);
+    this.flight.group.visible = true;
+    this.grid.visible = false;
+    this.scene.background = new THREE.Color(0xcfe3ff);
+    this.flightOn = true;
+  }
+
+  // x, y in metres (flight), theta = body pitch in radians (nose up positive)
+  setFlightPose(x, y, theta) {
+    if (!this.flightOn) return;
+    for (const g of [this.cad, this.placeholder, this.markers]) {
+      g.position.set(0, Math.max(0, y), -x);
+      g.rotation.set(theta, 0, 0);
+    }
+    const length = this.cad.visible && this.inner ? this.cadLength : (this.placeholderLength || 4);
+    const dist = Math.max(9, length * 2.6);
+    const target = new THREE.Vector3(0, Math.max(0, y) + 0.6, -x - 1);
+    this.camera.position.set(dist * 0.95, target.y + dist * 0.28, target.z + dist * 0.45);
+    this.camera.near = 0.1;
+    this.camera.far = 2000;
+    this.camera.updateProjectionMatrix();
+    this.controls.target.copy(target);
+    this.controls.update();
+    this.render();
+  }
+
+  exitFlight() {
+    if (!this.flightOn) return;
+    this.flightOn = false;
+    for (const g of [this.cad, this.placeholder, this.markers]) { g.position.set(0, 0, 0); g.rotation.set(0, 0, 0); }
+    if (this.flight) this.flight.group.visible = false;
+    this.grid.visible = true;
+    this.scene.background = new THREE.Color(0xeaeff6);
+    this.fitCamera(this.cad.visible ? this.cad : this.placeholder);
   }
 
   fitCamera(target) {

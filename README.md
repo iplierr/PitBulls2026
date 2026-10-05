@@ -22,6 +22,8 @@ Double-clicking `index.html` won't work, because browsers block JavaScript modul
 - Each design follows numbered steps — **1 Design numbers → 2 3D model (optional) → 3 Parts & balance → 4 Fly it** — with ✓ / ! marks showing what's done. The **Summary** page always shows **Your next step**.
 - **Type in the units you know:** "28 ft", "8' 6\"", "400 lb", "15 mph", "77 F", "120 sqft", "35000 psi". Values are converted to metric automatically, and the other unit is shown under each box.
 - Rarely used buttons (Duplicate, Start over, Delete) are under **More ▾**.
+- **See it fly before you know everything:** Design numbers shows *The basics* (wing size, weights, deck height). Optional topics live under *Add more info* (launch, wind & weather, aerodynamics, more sizes, custom limits). Unknown numbers use typical values, which are always labelled Estimated and listed as "Assumed for now". A switch turns this off for strict mode.
+- **Fly it:** a 3D flight view (water, 22 ft deck, the craft following the path), sliders to try push speed, wind, wing angle, drag and weight (nothing is saved until you click Save), a spec sheet in metric and US units, and *How to make it fly further* tips. Each tip is re-run through the simulator and shows its gain in m and ft.
 
 ## Where things are
 

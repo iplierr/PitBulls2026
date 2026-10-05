@@ -27,7 +27,8 @@ const GLOSSARY = [
 ];
 
 const FAQ = [
-  ['Why does a box say "Not provided"?', 'The app never fills in numbers you didn\'t give it. Type the value in, or — for things like drag you can\'t measure yet — click "Use typical value". Those are then marked Estimated.'],
+  ["We don’t know the push speed, wind or aerodynamics yet. Can we still see it fly?", "Yes. Fill in the basics (wingspan, chord or wing area, pilot and craft weight). Anything else you don’t know uses a typical value, so the flight runs straight away. Typical values are marked Estimated and listed under “Assumed for now”. Replace them with real numbers when you have them."],
+  ["Why does a box say \"Not provided\"?", "Nobody has entered it, and there is no typical value for it (for example your wingspan). If you switch off “Fill anything we don’t know yet with typical values”, the unknown numbers show as Not provided too."],
   ['Why is a result marked "Estimated"?', 'Because at least one number it depends on is a guess or a typical value. Replace guesses with real measurements and the label changes.'],
   ['Can I type feet and pounds?', 'Yes. Type "28 ft", "8\' 6"", "400 lb", "15 mph" or "77 F" into any matching box and it is converted to metric for you. The other unit is shown under each box.'],
   ['Is the flight distance a prediction?', 'No. It is a simplified estimate, useful for comparing your own design options. Real craft often pitch up, stall or break. Record real tests and compare.'],
@@ -53,10 +54,10 @@ export function show(el) {
       <h2>Quick start (5 minutes)</h2>
       <ol class="help-steps">
         <li><strong>Start a design.</strong> On the Dashboard, click <em>Enter Design Manually</em> (or <em>Upload CAD Model</em> if you have a 3D file). Not ready yet? Click <em>Try an example design</em>.</li>
-        <li><strong>Step 1 – Design numbers.</strong> Fill in wingspan, chord, pilot and craft weight, launch speed and deck height. Feet and pounds are fine. The box on the right tells you what's still missing.</li>
-        <li><strong>Don't know the aerodynamics numbers?</strong> Click <em>Use typical values</em>. They'll be marked Estimated — that's fine to start.</li>
+        <li><strong>Step 1 – Design numbers.</strong> Fill in <em>The basics</em>: wingspan, chord (or wing area), pilot and craft weight. Feet and pounds are fine. The deck height is already set to the official 22 ft for Miami.</li>
+        <li><strong>Know more?</strong> Under <em>Add more info</em>, open a topic (launch speed, wind &amp; weather, aerodynamics, more sizes) and fill in what you have. Anything you skip uses a typical value, marked Estimated.</li>
         <li><strong>Step 3 – Parts &amp; balance.</strong> List the parts with weights and where they sit (distance from the nose). This finds the balance point.</li>
-        <li><strong>Step 4 – Fly it.</strong> Watch the estimated flight and read <em>What does this mean?</em></li>
+        <li><strong>Step 4 – Fly it.</strong> Watch it fly in 3D and in the side view. Move the sliders to try a faster push, wind, a different wing angle or weight. Read <em>How to make it fly further</em> — each tip shows how many metres/feet it adds — and the <em>Spec sheet</em>.</li>
         <li><strong>Summary.</strong> Check the Miami rules and <em>What could we fix?</em> — it suggests specific changes with numbers.</li>
         <li><strong>Test for real.</strong> Record practice tests under <em>Physical tests</em> and compare with the simulation.</li>
       </ol>

@@ -1,8 +1,10 @@
 // Turns a stored design into resolved values with sources, lists what is missing,
 // runs sanity checks and builds the completeness checklist.
-// Rule: nothing unknown is ever filled in silently. Derived values are "calculated"
-// (or "estimated" if any input to them is estimated).
+// Rule: nothing unknown is filled in silently. Derived values are "calculated" (or "estimated" if any input
+// to them is estimated). Typical values for unknowns are only used when the design's "fill unknowns with
+// typical values" switch is on, and are always labelled Estimated and listed as assumed.
 import { FIELDS, FIELD } from './fields.js';
+import { rulesetOf } from './rules.js';
 import { analyze, G } from './physics.js';
 
 const R_AIR = 287.05;
@@ -62,6 +64,17 @@ export function withoutPocketing(d) {
 }
 export const hasPocketing = (d) => d.components.some((c) => !pocketRemoval(c).none);
 
+// Once real data can calculate a value, a stored *typical* value (Estimated, no source note) for it is removed,
+// so real numbers always win over guesses. Returns true if something was removed.
+export function dropOutdatedTypicals(d) {
+  const real = (id) => typeof d.values[id] === 'number' && d.source[id] && d.source[id] !== 'estimated';
+  if (d.source.airDensity === 'estimated' && !d.sourceNote?.airDensity && real('temperature') && (real('pressure') || real('elevation'))) {
+    delete d.values.airDensity; delete d.source.airDensity;
+    return true;
+  }
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 // resolve(design) -> { v, src, how }
 //   v:   value per id (fields + derived keys: totalMass, weight, AR, headwind, mu)
@@ -78,10 +91,39 @@ export function resolve(d) {
     src[f.id] = d.source[f.id] || 'entered';
   }
   const has = (id) => isNum(v[id]);
+  // A stored typical air density must not hide a value calculated from real temperature and pressure
+  if (has('airDensity') && src.airDensity === 'estimated' && !d.sourceNote?.airDensity && has('temperature') && has('pressure')
+    && src.temperature !== 'estimated' && src.pressure !== 'estimated') {
+    delete v.airDensity; delete src.airDensity;
+  }
   const worst = (ids, extra = []) =>
     ids.some((i) => src[i] === 'estimated') || extra.includes('estimated') ? 'estimated' : 'calculated';
   const put = (id, value, inputs, text, extra) => { v[id] = value; src[id] = worst(inputs, extra); how[id] = text; };
 
+  derive();
+  // Unknown numbers: with "fill unknowns with typical values" on (the default), each missing value that has a
+  // documented typical value is used for the flight — always labelled Estimated and listed as assumed.
+  const assumed = [];
+  const officialDeck = rulesetOf(d)?.deck;
+  if (!has('deckHeight') && officialDeck) {
+    v.deckHeight = officialDeck.m; src.deckHeight = 'entered'; how.deckHeight = officialDeck.note;
+  }
+  if (d.autoAssume !== false) {
+    for (const f of FIELDS) {
+      if (!f.assume || v[f.id] !== undefined) continue;
+      if ((f.id === 'aoa' || f.id === 'clMax') && has('knownCL')) continue;
+      if ((f.id === 'cd0' || f.id === 'oswald') && has('knownCD')) continue;
+      if (f.id === 'tailEff' && v.tailType === 'none') continue;
+      v[f.id] = f.assume.value;
+      src[f.id] = 'estimated';
+      how[f.id] = `Not entered yet, so a typical value is assumed: ${f.assume.note}`;
+      assumed.push(f.id);
+    }
+    if (assumed.length) derive();
+  }
+  return { v, src, how, assumed };
+
+  function derive() {
   // Mass from the parts list
   const parts = d.components.filter((c) => isNum(componentMass(c)));
   if (!has('craftMass') && parts.length) {
@@ -132,8 +174,7 @@ export function resolve(d) {
     put('clMax', (2 * v.weight) / (v.airDensity * v.wingArea * v.stallSpeed ** 2),
       ['stallSpeed', 'totalMass', 'wingArea', 'airDensity'], 'From stall speed: CLmax = 2W ÷ (ρ × S × Vs²).');
   }
-
-  return { v, src, how };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -178,10 +219,22 @@ export function simParams(r) {
 }
 
 // Returns { r, missing, params, analysis|null }
-export function evaluate(d, overrides = null) {
+// overrides: { fieldId: value } tried on top of the design (e.g. sliders or a test's conditions)
+export function evaluate(d, overrides = null, overrideSrc = 'entered') {
   const r = resolve(d);
   if (overrides) {
-    for (const [k, val] of Object.entries(overrides)) { r.v[k] = val; r.src[k] = 'entered'; }
+    for (const [k, val] of Object.entries(overrides)) {
+      r.v[k] = val; r.src[k] = overrideSrc;
+      r.assumed = (r.assumed || []).filter((id) => id !== k);
+      if (k === 'craftMass' || k === 'pilotMass') {
+        r.v.totalMass = r.v.craftMass + r.v.pilotMass; r.src.totalMass = overrideSrc;
+        r.v.weight = r.v.totalMass * G; r.src.weight = overrideSrc;
+      }
+      if (k === 'windSpeed' || k === 'windDir') {
+        r.v.headwind = r.v.windSpeed === 0 ? 0 : r.v.windSpeed * Math.cos((r.v.windDir ?? 0) * DEG);
+        r.src.headwind = overrideSrc;
+      }
+    }
   }
   const missing = simulationMissing(r);
   if (missing.length) return { r, missing, params: null, analysis: null };

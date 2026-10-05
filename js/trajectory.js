@@ -210,6 +210,7 @@ export class TrajectoryView {
     ctx.textAlign = 'right';
     ctx.font = '12px system-ui, sans-serif';
     ctx.fillText(`t = ${shownT.toFixed(2)} s`, w - pad.r - 4, pad.t + 12);
+    this.onFrame?.(shownT, flight); // lets the 3D flight view follow the same moment
   }
 
   // Draws points with t <= tMax; returns the last drawn point.

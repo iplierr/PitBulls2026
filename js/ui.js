@@ -224,6 +224,7 @@ export function focusField(container, id) {
   if (!div) return false;
   div.hidden = false;
   div.closest('.field-group')?.removeAttribute('hidden');
+  div.closest('[data-topic-body]')?.removeAttribute('hidden');
   div.scrollIntoView({ block: 'center', behavior: 'smooth' });
   div.classList.add('flash');
   setTimeout(() => div.classList.remove('flash'), 1600);

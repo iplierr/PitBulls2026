@@ -2,8 +2,8 @@
 import { db, getDesign, touch, newVersion, duplicateAsNew, designTitle, deleteDesign } from '../store.js';
 import * as history from '../history.js';
 import { FIELD, GROUPS, LEVELS, LEVEL_LABEL } from '../fields.js';
-import { evaluate, centerOfMass, sanityChecks, completeness, assumableMissing, applyAssumptions } from '../model.js';
-import { esc, fmt, badge, toast, groupsHTML, refreshFields, bindFields, focusField } from '../ui.js';
+import { evaluate, centerOfMass, sanityChecks, completeness, assumableMissing, applyAssumptions, dropOutdatedTypicals } from '../model.js';
+import { esc, fmt, badge, toast, groupsHTML, fieldHTML, refreshFields, bindFields, focusField } from '../ui.js';
 import { simulationSource } from '../calcs.js';
 import * as cadTab from './cad-tab.js';
 import * as massTab from './mass-tab.js';
@@ -21,7 +21,7 @@ const inputsTab = { render: renderInputs, update: updateInputs };
 // Plain-language tab names. Steps 1–4 are the normal order; "More tools" are optional extras.
 const TABS = [
   ['overview', 'Summary', overviewTab, { home: true, desc: 'Your results, the Miami rules check, and what to do next.' }],
-  ['inputs', 'Design numbers', inputsTab, { step: 1, desc: 'Step 1 — type in the craft\'s size, weight and launch conditions. You can type feet and pounds (e.g. "28 ft", "400 lb").' }],
+  ['inputs', 'Design numbers', inputsTab, { step: 1, desc: 'Step 1 — the basics (wing size and weights), then add any extra info you have under "Add more info". Feet and pounds are fine.' }],
   ['cad', '3D model', cadTab, { step: 2, desc: 'Step 2 (optional) — upload your CAD file (STL or GLB) to measure the craft automatically.' }],
   ['mass', 'Parts & balance', massTab, { step: 3, desc: 'Step 3 — list the parts, their weights and positions to find the balance point (centre of mass).' }],
   ['simulate', 'Fly it', simTab, { step: 4, desc: 'Step 4 — watch the estimated flight, with graphs and a plain-English explanation.' }],
@@ -45,6 +45,7 @@ const ctx = {
   get app() { return S.app; },
   // Called after any change to the design
   changed(fieldId = null) {
+    if (dropOutdatedTypicals(S.d)) toast('Air density is now calculated from your temperature and pressure.');
     touch(S.d);
     history.record(S.d);
     compute();
@@ -446,60 +447,129 @@ function renderOverview(panel) {
 // ---------------------------------------------------------------------------
 // Design numbers step
 // ---------------------------------------------------------------------------
+// The basics are always shown. Everything else is an optional topic under "Add more info";
+// skipped topics use typical values (labelled Estimated) when the auto-fill switch is on.
+const CORE_FIELDS = ['span', 'chord', 'wingArea', 'pilotMass', 'craftMass', 'deckHeight'];
+const TOPICS = [
+  { id: 'launch', title: 'Launch speed & angle', icon: '⇢', why: 'How fast the crew pushes and the angle leaving the deck. The biggest effect on distance.', fields: ['launchSpeed', 'launchAngle'] },
+  { id: 'weather', title: 'Wind & weather', icon: '≋', why: 'Wind, temperature and air density on the day — or real NASA weather for Miami.', fields: ['windSpeed', 'windDir', 'temperature', 'pressure', 'elevation', 'airDensity'], extra: 'nasa' },
+  { id: 'aero', title: 'Aerodynamics', icon: '◠', why: 'Wing angle, lift and drag numbers, and your airfoil file. Most teams start with typical values.', fields: ['aoa', 'clMax', 'cd0', 'oswald', 'alphaL0', 'knownCL', 'knownCD', 'stallSpeed'], extra: 'airfoil' },
+  { id: 'size', title: 'More size details', icon: '⤢', why: 'Overall length, width and height (used by the rules check), and aspect ratio.', fields: ['length', 'width', 'height', 'aspectRatio'] },
+  { id: 'rules', title: 'Custom event limits', icon: '⚑', why: 'Only if your event differs from the Miami 2026 rules already built in.', fields: ['ruleMaxSpan', 'ruleMaxMass'] },
+];
+const hasValue = (id) => S.d.values[id] !== undefined && S.d.values[id] !== null && S.d.values[id] !== '';
+
+function topicOpen(id) {
+  const t = TOPICS.find((x) => x.id === id);
+  return (S.d.openTopics || []).includes(id) || t.fields.some(hasValue)
+    || (id === 'weather' && !!S.d.weather) || (id === 'aero' && !!S.d.airfoil);
+}
+
 function renderInputs(panel) {
-  const level = db.settings.level || 'basic';
   panel.innerHTML = `
     <div class="inputs-layout">
-      <div>
-      ${nasaPanelHTML(S.d)}
-      <div class="panel section">
-        <div class="panel-head">
-          <h2>Design inputs</h2>
-          <div class="level-switch" role="radiogroup" aria-label="How much detail to show">
-            ${LEVELS.map((l) => `<label><input type="radio" name="level" value="${l}" ${l === level ? 'checked' : ''}> ${LEVEL_LABEL[l]}</label>`).join('')}
+      <div id="input-form">
+        <div class="panel section">
+          <h2>The basics</h2>
+          <p class="hint">These are enough to see your plane fly. Feet and pounds are fine ("21 ft 10 in", "110 lb").
+            Grey values are worked out from other numbers; type over them to use your own. ↺ clears a value.</p>
+          <fieldset class="field-group core-fields">${CORE_FIELDS.map((id) => fieldHTML(FIELD[id])).join('')}</fieldset>
+          <label class="auto-switch"><input type="checkbox" id="auto-assume" ${S.d.autoAssume === false ? '' : 'checked'}>
+            <span><strong>Fill anything we don't know yet with typical values</strong>, so the flight always runs.
+            <small>Typical values are marked <span class="badge estimated">Estimated</span> and listed on the right — replace them with real numbers when you have them.</small></span></label>
+        </div>
+        <div class="panel section">
+          <h2>Add more info</h2>
+          <p class="hint">Pick what you know. Anything you skip uses a typical value. You can come back any time.</p>
+          <div class="topic-grid">
+            ${TOPICS.map((t) => `<button type="button" class="topic-card" data-topic="${t.id}" aria-expanded="false">
+              <span class="topic-icon" aria-hidden="true">${t.icon}</span>
+              <span class="topic-title">${t.title}</span>
+              <span class="topic-why">${t.why}</span>
+              <span class="topic-status" data-topic-status="${t.id}"></span>
+            </button>`).join('')}
           </div>
         </div>
-        <p class="hint">Start with <strong>Basic</strong>. Blank fields are "Not provided" — the app never fills them in silently.
-          Grey values are calculated from other inputs; type over them to enter your own. ↺ clears a value (or restores the CAD measurement).
-          Need feet or pounds? Use <strong>⇄ Units</strong> at the top.</p>
-        <form id="input-form" novalidate>${groupsHTML('inputs')}</form>
-      </div>
-      ${airfoilPanelHTML(S.d)}
+        ${TOPICS.map((t) => `<div class="panel section topic-body" data-topic-body="${t.id}" hidden>
+          <div class="panel-head"><h2>${t.icon} ${t.title}</h2><button type="button" class="btn ghost small" data-topic-close="${t.id}">Hide</button></div>
+          ${t.id === 'aero' ? '<p class="hint">These describe how the wing turns speed into lift and drag. Don’t know them? That’s normal — leave them blank and typical values are used.</p>' : ''}
+          <fieldset class="field-group">${t.fields.map((id) => fieldHTML(FIELD[id])).join('')}</fieldset>
+          ${t.extra === 'nasa' ? nasaPanelHTML(S.d) : ''}${t.extra === 'airfoil' ? airfoilPanelHTML(S.d) : ''}
+        </div>`).join('')}
       </div>
       <aside class="panel section sticky-side" id="inputs-side"></aside>
     </div>`;
   const form = panel.querySelector('#input-form');
   bindFields(form, () => S.d, (id) => ctx.changed(id));
-  panel.querySelectorAll('input[name="level"]').forEach((r) => r.addEventListener('change', () => {
-    db.settings.level = r.value;
+  panel.querySelector('#auto-assume').addEventListener('change', (e) => {
+    S.d.autoAssume = e.target.checked;
+    ctx.changed(null);
+  });
+  form.addEventListener('click', (e) => {
+    const card = e.target.closest('[data-topic]');
+    const close = e.target.closest('[data-topic-close]');
+    const id = card?.dataset.topic || close?.dataset.topicClose;
+    if (!id) return;
+    const open = new Set(S.d.openTopics || []);
+    const show = card ? panel.querySelector(`[data-topic-body="${id}"]`).hidden : false;
+    if (show) open.add(id); else open.delete(id);
+    S.d.openTopics = [...open];
     touch(S.d);
-    updateInputs(panel, ctx, null);
-  }));
+    if (!show) panel.querySelector(`[data-topic-body="${id}"]`).hidden = true;
+    showTopics(panel, show ? id : null, show ? null : id);
+  });
   bindMissingBlock(panel.querySelector('#inputs-side'));
-  bindNasaPanel(panel.querySelector('.nasa-panel'), ctx);
-  bindAirfoilPanel(panel.querySelector('.airfoil-panel'), ctx);
+  const nasa = panel.querySelector('.nasa-panel');
+  if (nasa) bindNasaPanel(nasa, ctx);
+  const af = panel.querySelector('.airfoil-panel');
+  if (af) bindAirfoilPanel(af, ctx);
+  showTopics(panel, null, null);
   updateInputs(panel, ctx, null);
+}
+
+// keepClosed: a topic the user just hid (it stays hidden even if it has values)
+function showTopics(panel, scrollTo, keepClosed) {
+  for (const t of TOPICS) {
+    const body = panel.querySelector(`[data-topic-body="${t.id}"]`);
+    const open = t.id === keepClosed ? false : (topicOpen(t.id) || !body.hidden);
+    body.hidden = !open;
+    const card = panel.querySelector(`[data-topic="${t.id}"]`);
+    card.classList.toggle('open', open);
+    card.setAttribute('aria-expanded', String(open));
+  }
+  if (scrollTo) panel.querySelector(`[data-topic-body="${scrollTo}"]`).scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function updateInputs(panel, _ctx, skipId) {
   const form = panel.querySelector('#input-form');
   if (!form) return;
   const requiredIds = S.ev.missing.flatMap((m) => m.fieldIds.slice(0, 1));
-  refreshFields(form, S.d, S.ev.r, { level: db.settings.level || 'basic', requiredIds, skipId });
-  refreshNasaPanel(panel.querySelector('.nasa-panel'), ctx);
+  refreshFields(form, S.d, S.ev.r, { level: 'advanced', requiredIds, skipId });
+  const nasa = panel.querySelector('.nasa-panel');
+  if (nasa) refreshNasaPanel(nasa, ctx);
+  const assumed = S.ev.r.assumed || [];
+  for (const t of TOPICS) {
+    const filled = t.fields.filter(hasValue).length;
+    const typical = t.fields.filter((f) => assumed.includes(f)).length;
+    const el = panel.querySelector(`[data-topic-status="${t.id}"]`);
+    el.innerHTML = filled ? `<span class="st-done">✓ ${filled} filled in</span>${typical ? ` · ${typical} typical` : ''}`
+      : typical ? '<span class="st-typ">Using typical values</span>' : '<span class="muted">Optional</span>';
+  }
   const a = S.ev.analysis;
   const checks = sanityChecks(S.d, S.ev.r, a).filter((c) => c.level !== 'info');
   panel.querySelector('#inputs-side').innerHTML = `
     <h2>Live estimate</h2>
     ${a ? `
       <div class="metrics">
-        <div class="metric"><div class="label">Distance</div><div class="value">${fmt(a.flight.distance)} <small>m</small></div></div>
+        <div class="metric"><div class="label">Distance</div><div class="value">${fmt(a.flight.distance)} <small>m</small></div><small class="muted">${fmt(a.flight.distance / 0.3048, 0)} ft</small></div>
         <div class="metric"><div class="label">Flight time</div><div class="value">${fmt(a.flight.time, 2)} <small>s</small></div></div>
         <div class="metric"><div class="label">Max height</div><div class="value">${fmt(a.flight.maxHeight)} <small>m</small></div></div>
-        <div class="metric"><div class="label">Stall speed</div><div class="value">${fmt(a.stallSpeed)} <small>m/s</small></div></div>
+        <div class="metric"><div class="label">Stall speed</div><div class="value">${fmt(a.stallSpeed)} <small>m/s</small></div><small class="muted">${fmt(a.stallSpeed / 0.44704, 0)} mph</small></div>
       </div>
-      <p class="hint">Updates as you type. ${Object.values(S.ev.r.src).includes('estimated') ? 'Uses some <strong>Estimated</strong> inputs.' : ''}</p>
-      <a class="btn primary small" href="#/design/${S.d.id}/simulate">See the flight →</a>`
+      <a class="btn primary small" href="#/design/${S.d.id}/simulate">▶ Watch it fly</a>
+      ${assumed.length ? `<h3>Assumed for now (typical values)</h3>
+        <ul class="assumed-list">${assumed.map((id) => `<li><span>${esc(FIELD[id].label)}</span><span class="num">${+Number(S.ev.r.v[id]).toPrecision(3)} ${esc(FIELD[id].unit || '')}</span></li>`).join('')}</ul>
+        <p class="hint">These are guesses, so the distance is a rough estimate. Try other values with the sliders on the <strong>Fly it</strong> step, or add the real numbers under <em>Add more info</em>.</p>` : '<p class="hint">No typical values used — every number came from your team.</p>'}`
     : missingBlockHTML(S.ev)}
     ${checks.length ? `<h3>Checks</h3><ul class="check-list compact">${checks.map((c) => `<li class="check ${c.level}"><span class="check-icon">${c.level === 'error' ? '✕' : '!'}</span><span>${esc(c.text)}</span></li>`).join('')}</ul>` : ''}`;
 }
