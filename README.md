@@ -63,7 +63,7 @@ Double-clicking `index.html` won't work, because browsers block JavaScript modul
 
 The Overview tab checks the design against the **official Red Bull Flugtag Miami 2026 rules**, read from redbull.com on 2026-09-29: width **less than 22 ft** (Miami FAQ; the rules page says 28 ft — the stricter value is used), nose-to-tail ≤ 20 ft, craft + pilot ≤ 400 lb, and height with the pilot crouched ≤ 10 ft. It also gives a checklist for the rules you confirm yourselves (human power only, floats, no toxic materials, and so on).
 
-The deck height is **not confirmed**: the rules page says 22 ft, but some Miami event listings say 30 ft. Ask the organisers. Rules can change, so re-check the page before the event.
+The deck height is **22 ft (6.71 m)**, confirmed by the team on 5 Oct 2026. Designs can set it with one click from the rules panel. Rules can change, so re-check the page before the event.
 
 ## Source labels
 

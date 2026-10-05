@@ -13,7 +13,7 @@ import * as calcTab from './calc-tab.js';
 import { nasaPanelHTML, bindNasaPanel, refreshNasaPanel } from './nasa-panel.js';
 import { rulesPanelHTML, bindRulesPanel } from './rules-panel.js';
 import { airfoilPanelHTML, bindAirfoilPanel } from './airfoil-panel.js';
-import { ruleChecks, partsRuleWarnings } from '../rules.js';
+import { ruleChecks, partsRuleWarnings, rulesetOf } from '../rules.js';
 
 const overviewTab = { render: renderOverview, update: renderOverview };
 const inputsTab = { render: renderInputs, update: updateInputs };
@@ -288,7 +288,7 @@ export function missingBlockHTML(ev) {
       <strong>The simulation cannot run yet.</strong>
       <ul class="missing-list">
         ${ev.missing.map((m) => `<li>Cannot calculate the flight because <strong>${esc(m.label.toLowerCase())}</strong> is missing — ${esc(m.why)}
-          <button class="linkbtn" data-goto-field="${m.fieldIds[0]}">Enter it →</button></li>`).join('')}
+          <button class="linkbtn" data-goto-field="${m.fieldIds[0]}">Enter it →</button>${m.id === 'deckHeight' && S && rulesetOf(S.d)?.deck ? ` <button class="btn tiny" data-deck-official="1">Use the official ${rulesetOf(S.d).deck.ft} ft</button>` : ''}</li>`).join('')}
       </ul>
       ${assumable.length ? `
         <div class="assume-all">
@@ -302,6 +302,15 @@ export function bindMissingBlock(root) {
   root.addEventListener('click', (e) => {
     const g = e.target.closest('[data-goto-field]');
     if (g) { ctx.gotoField(g.dataset.gotoField); return; }
+    if (e.target.closest('[data-deck-official]')) {
+      const deck = rulesetOf(S.d).deck;
+      S.d.values.deckHeight = +deck.m.toFixed(4);
+      S.d.source.deckHeight = 'entered';
+      S.d.sourceNote = { ...(S.d.sourceNote || {}), deckHeight: deck.note };
+      toast(`Deck height set to the official ${deck.ft} ft.`);
+      ctx.changed(null);
+      return;
+    }
     const a = e.target.closest('[data-assume-all]');
     if (a) {
       applyAssumptions(S.d, a.dataset.assumeAll.split(','));

@@ -43,9 +43,11 @@ export function rulesPanelHTML(d, ev, com) {
       </tbody></table>
 
       <div class="deck-note">
-        <strong>Deck height:</strong> ${esc(rs.deck.advice)}
-        ${rs.deck.options.map((o) => `<br>• ${o.ft} ft (${(o.ft * 0.3048).toFixed(2)} m) — ${esc(o.note)} <button class="btn tiny" data-deck="${o.ft}">Use ${o.ft} ft</button>`).join('')}
-        <br><small class="muted">Currently in the design: ${isNum(deckVal) ? `${deckVal.toFixed(2)} m` : 'not provided'}. The buttons mark the value <strong>Estimated</strong> with this note, because it isn't confirmed.</small>
+        <strong>Deck height: ${rs.deck.ft} ft (${rs.deck.m.toFixed(2)} m)</strong> — official, confirmed by the team on 5 Oct 2026.
+        ${isNum(deckVal) && Math.abs(deckVal - rs.deck.m) < 0.02
+          ? '<br>✓ This design uses the official deck height.'
+          : `<br>${isNum(deckVal) ? `<strong>This design uses ${deckVal.toFixed(2)} m (${(deckVal / 0.3048).toFixed(1)} ft) instead.</strong> ` : 'This design has no deck height yet. '}
+             <button class="btn tiny" data-deck="${rs.deck.ft}">Use ${rs.deck.ft} ft</button>`}
       </div>
 
       <h3>Rules you confirm yourselves</h3>
@@ -91,12 +93,11 @@ export function bindRulesPanel(root, ctx, onChange) {
     const b = e.target.closest('[data-deck]');
     if (!b) return;
     const rs = rulesetOf(ctx.d);
-    const opt = rs.deck.options.find((o) => String(o.ft) === b.dataset.deck);
     const d = ctx.d;
-    d.values.deckHeight = +(opt.ft * 0.3048).toFixed(3);
-    d.source.deckHeight = 'estimated';
-    d.sourceNote = { ...(d.sourceNote || {}), deckHeight: `${opt.ft} ft from ${rs.name}: ${opt.note} Not confirmed — ${rs.deck.advice}` };
-    toast(`Deck height set to ${opt.ft} ft (${(opt.ft * 0.3048).toFixed(2)} m), marked Estimated.`);
+    d.values.deckHeight = +rs.deck.m.toFixed(4);
+    d.source.deckHeight = 'entered';
+    d.sourceNote = { ...(d.sourceNote || {}), deckHeight: rs.deck.note };
+    toast(`Deck height set to the official ${rs.deck.ft} ft (${rs.deck.m.toFixed(2)} m).`);
     ctx.changed(null);
     onChange();
   });

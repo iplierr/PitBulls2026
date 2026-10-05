@@ -48,8 +48,8 @@ export const FIELDS = [
   // ---- Launch
   { id: 'launchSpeed', group: 'launch', level: 'basic', label: 'Speed leaving the deck', unit: 'm/s', min: 0, max: 60, step: 0.1, example: '6',
     what: 'How fast the craft is moving at the deck edge. Measure it: time a practice push over a known distance.' },
-  { id: 'deckHeight', group: 'launch', level: 'basic', label: 'Deck height above water', unit: 'm', min: 0.5, max: 50, step: 0.1, example: '9',
-    what: 'Height of the launch deck edge above the water surface. Get it from the event organisers.' },
+  { id: 'deckHeight', group: 'launch', level: 'basic', label: 'Deck height above water', unit: 'm', min: 0.5, max: 50, step: 0.1, example: '6.71',
+    what: 'Height of the launch deck edge above the water surface. Red Bull Flugtag Miami 2026: 22 ft (6.71 m), confirmed by the team.' },
   { id: 'launchAngle', group: 'launch', level: 'more', label: 'Launch angle', unit: '°', min: -60, max: 60, step: 1, example: '0',
     what: 'Direction of travel when leaving the deck. 0 = level, positive = upward.',
     assume: { value: 0, note: 'Level launch assumed (flat deck edge).' } },

@@ -28,12 +28,11 @@ export const RULESETS = {
       totalMass: 400 * LB,    // 181.4 kg, craft + pilot
       crouchHeight: 10 * FT,  // 3.048 m
     },
+    // Confirmed by the team on 2026-10-05 (matches the "22-foot-high ramp" on the Miami rules page).
     deck: {
-      options: [
-        { ft: 22, note: 'Rules page text mentions "a 22-foot-high ramp" (in general safety text shared with other events — it also mentions a river).' },
-        { ft: 30, note: 'Some Miami event listings describe a 30-foot flight deck.' },
-      ],
-      advice: 'The sources disagree. Confirm the deck height with the organisers before relying on distance estimates.',
+      ft: 22,
+      m: 22 * FT, // 6.7056 m
+      note: 'Official deck height 22 ft (6.71 m), confirmed by the team on 5 Oct 2026. Matches the "22-foot-high ramp" on the Miami rules page.',
     },
     // Rules that can't be checked from numbers — the team confirms them.
     manual: [
