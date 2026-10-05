@@ -19,7 +19,7 @@ export function render(panel, ctx) {
       <div class="panel upload-side">
         <h2>1. Choose a file</h2>
         <label id="dropzone" class="dropzone" tabindex="0">
-          <input type="file" id="file-input" accept=".stl,.glb" hidden>
+          <input type="file" id="file-input" accept=".stl,.glb,.sldasm,.sldprt,.step,.stp,.fcstd" hidden>
           <strong>${cad ? 'Replace model: drop' : 'Drop'} an STL or GLB file here</strong>
           <span>or click to browse</span>
         </label>
@@ -134,9 +134,27 @@ async function restoreSaved() {
   }
 }
 
+// Native CAD formats can't be read in a browser: explain how to export an STL instead.
+const NATIVE_HELP = {
+  sldasm: 'a SolidWorks assembly', sldprt: 'a SolidWorks part', slddrw: 'a SolidWorks drawing',
+  step: 'a STEP file', stp: 'a STEP file', fcstd: 'a FreeCAD file', f3d: 'a Fusion 360 file', ipt: 'an Inventor part', iam: 'an Inventor assembly',
+};
+function nativeFormatHelp(name, ext) {
+  const solidworks = ext.startsWith('sld');
+  return `<strong>${esc(name)}</strong> is ${NATIVE_HELP[ext]}. Browsers can't open that format — please export it as <strong>STL</strong> and upload the STL.
+    ${solidworks ? `<ol class="export-steps">
+      <li>Open the assembly in SolidWorks. Its <code>.SLDPRT</code> part files must be in the same folder (download the whole CAD folder, not just the .SLDASM).</li>
+      <li><strong>File → Save As</strong>, and choose <strong>STL (*.stl)</strong> as the file type.</li>
+      <li>Click <strong>Options…</strong>: Binary, unit <strong>Millimeters</strong>, resolution Coarse, and tick <strong>"Save all components of an assembly in a single file"</strong>.</li>
+      <li>Save, then drop the .stl here and choose <strong>Millimetres</strong> and <strong>Y is up</strong> (SolidWorks' default).</li>
+    </ol>` : ' Most CAD programs have File → Export (or Save As) → STL; choose millimetres.'}`;
+}
+
 async function handleFile(file) {
   if (!file) return;
   const { d, app } = P.ctx;
+  const ext0 = file.name.split('.').pop().toLowerCase();
+  if (NATIVE_HELP[ext0]) { setStatus(nativeFormatHelp(file.name, ext0), 'error'); return; }
   setStatus(`Loading ${esc(file.name)}…`);
   try {
     const ext = file.name.split('.').pop().toLowerCase();
