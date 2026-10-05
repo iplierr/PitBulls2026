@@ -1,4 +1,4 @@
-// CAD tab: upload STL/GLB, orientation/units, geometry analysis, part roles, apply measurements.
+// 3D model step: upload STL/GLB, orientation/units, geometry analysis, part roles, apply measurements.
 import { db, uid, touch } from '../store.js';
 import { FIELD } from '../fields.js';
 import { analyzeCad, cadMeasurements } from '../cad-analysis.js';
@@ -237,7 +237,7 @@ function onAnalysisClick(e) {
         notes: 'Position = centre of the CAD part\'s bounding box (measured). Mass still needed.', cadPart: p.i, cadVolume: p.volume ?? null });
       added++;
     }
-    toast(added ? `Added ${added} part(s) to the Mass & balance list. Enter their masses there.` : 'All parts are already in the list.');
+    toast(added ? `Added ${added} part(s) to the Parts & balance list. Enter their masses there.` : 'All parts are already in the list.');
     P.ctx.changed(null);
   }
 }
@@ -278,11 +278,11 @@ function renderAnalysis() {
         ${an.volume !== null ? m('Enclosed volume', `${sig(an.volume, 4)} m³`, 'Geometric volume of closed shapes. This is NOT mass: real parts are hollow or made of different materials.')
           : na('Enclosed volume', an.closed === false ? 'The mesh has gaps or open edges, so the enclosed volume cannot be trusted.' : 'Skipped for very large models.')}
         ${c ? m(c.kind === 'volume' ? 'Geometric centre (volume centroid)' : 'Geometric centre (surface centroid)', `${fmt(c.fromNose, 2)} m from nose, ${fmt(c.height, 2)} m up, ${fmt(c.lateral, 2)} m off-centre`,
-          'Centre of the SHAPE — not the centre of mass. Materials, hollow parts and the pilot change the real centre of mass (see Mass & balance).') : ''}
+          'Centre of the SHAPE — not the centre of mass. Materials, hollow parts and the pilot change the real centre of mass (see Parts & balance).') : ''}
         ${m('Top-view area of whole craft', `${sig(an.topArea.value, 3)} ± ${sig(an.topArea.pm, 2)} m²`, 'Silhouette seen from above (includes body and tail, so it is larger than the wing area).')}
         ${m('Side-view area of whole craft', `${sig(an.sideArea.value, 3)} ± ${sig(an.sideArea.pm, 2)} m²`, 'Silhouette seen from the side (relevant for crosswind).')}
         ${m('Separate parts found', an.partCount ?? '–', esc(an.partsNote || 'Disconnected bodies in the file.'))}
-        ${na('Mass / centre of mass', 'STL and GLB files contain no material or mass data. Enter masses in Mass & balance.')}
+        ${na('Mass / centre of mass', 'STL and GLB files contain no material or mass data. Enter masses in Parts & balance.')}
         ${na('Lift / drag coefficients', 'Cannot be derived from shape alone in this tool. Enter them, or use explicitly-labelled assumptions.')}
       </tbody></table></div>
     </div>
@@ -304,8 +304,8 @@ function renderAnalysis() {
           <td>${p.closed ? 'yes' : '<span class="muted">no</span>'}</td>
         </tr>`).join('')}
       </tbody></table></div>
-      <button class="btn small" id="parts-to-mass" type="button">Copy parts to the Mass &amp; balance list (positions measured, masses still needed)</button>
-    </div>` : `<div class="panel section"><h2>Parts</h2><p class="hint">${esc(an.partsNote || 'Only one part found.')} Wing area, chord and tail sizes are therefore <strong>not available from CAD</strong> — enter them on the Inputs and Mass &amp; balance tabs.</p></div>`}
+      <button class="btn small" id="parts-to-mass" type="button">Copy parts to the Parts &amp; balance list (positions measured, masses still needed)</button>
+    </div>` : `<div class="panel section"><h2>Parts</h2><p class="hint">${esc(an.partsNote || 'Only one part found.')} Wing area, chord and tail sizes are therefore <strong>not available from CAD</strong> — enter them in Design numbers and Parts &amp; balance tabs.</p></div>`}
 
     <div class="panel section">
       <h2>Use measurements in the design</h2>

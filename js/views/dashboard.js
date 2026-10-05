@@ -1,4 +1,5 @@
 // Dashboard: start a design (CAD or manual), open / version / duplicate designs, backups.
+import { uid, touch } from '../store.js';
 import { db, createDesign, newVersion, duplicateAsNew, deleteDesign, sortedDesigns, designTitle, exportJSON, importJSON, today, restoreFromTrash, purgeTrash } from '../store.js';
 import { cleanupFiles } from './cad-history.js';
 import { evaluate } from '../model.js';
@@ -19,6 +20,24 @@ function trashHTML() {
           <td class="row-actions"><button class="btn tiny" data-trash="restore" data-id="${t.id}">Restore</button><button class="btn tiny danger" data-trash="purge" data-id="${t.id}">Delete forever</button></td></tr>`).join('')}
       </tbody></table>
     </div>`;
+}
+
+// A filled-in practice design so new teammates can see results straight away.
+// Every value is marked Estimated with a note saying it is made up.
+function createExampleDesign() {
+  const d = createDesign({ name: 'Example glider (made-up numbers)' });
+  d.example = true;
+  d.description = 'Example for learning the app. All numbers are invented — not a real craft.';
+  const v = { span: 8, chord: 1.4, length: 4.5, height: 2.4, pilotMass: 70, launchSpeed: 6, deckHeight: 6.71, launchAngle: 0,
+    windSpeed: 3, windDir: 0, temperature: 27, pressure: 1013, aoa: 6, clMax: 1.2, cd0: 0.08, oswald: 0.7,
+    pilotX: 1.6, pilotY: 0.6, wingLEx: 1.1, tailArea: 1.5, tailSpan: 2.4, tailLEx: 3.8, tailEff: 0.9 };
+  d.sourceNote = {};
+  for (const [k, x] of Object.entries(v)) { d.values[k] = x; d.source[k] = 'estimated'; d.sourceNote[k] = 'Example value (made up) for learning the app.'; }
+  const part = (name, category, mass, x, y) => ({ id: uid(), name, category, mass, qty: 1, massSource: 'estimated', material: '', dims: '', x, y, notes: 'Example value (made up).' });
+  d.components = [part('Frame', 'Frame', 22, 1.9, 0.5), part('Main wing', 'Main wing', 20, 1.45, 1.9), part('Tail', 'Tail', 4, 4.1, 0.8),
+    part('Landing skid', 'Landing structure', 3, 1.5, 0.1), part('Decorations', 'Decorations', 3, 1.0, 1.2)];
+  touch(d);
+  return d;
 }
 
 export function show(el, app) {
@@ -54,9 +73,14 @@ export function show(el, app) {
   el.innerHTML = `
     <div class="hero">
       <h1>Flugtag Design &amp; Flight Lab</h1>
-      <p class="lead">Design → measure → calculate → simulate → test for real → compare → improve.
-        Every number shows where it came from, and nothing unknown is filled in for you.</p>
+      <p class="lead">Plan your Red Bull Flugtag craft, check it against the Miami 2026 rules, see an estimated flight, and compare with your real tests.</p>
     </div>
+    <ol class="how-it-works">
+      <li><span class="hiw-num">1</span><strong>Describe your craft</strong><span>Type in its size and weight (feet and pounds are fine), or upload a CAD file.</span></li>
+      <li><span class="hiw-num">2</span><strong>Check it</strong><span>See if it meets the Miami rules and whether it's balanced.</span></li>
+      <li><span class="hiw-num">3</span><strong>Watch it fly</strong><span>An estimated flight path, with a plain-English explanation.</span></li>
+      <li><span class="hiw-num">4</span><strong>Test &amp; improve</strong><span>Record real tests, compare, and try changes as new versions.</span></li>
+    </ol>
     <div class="choice-grid">
       <button class="choice" data-start="cad">
         <span class="choice-icon" aria-hidden="true">⬆</span>
@@ -69,6 +93,8 @@ export function show(el, app) {
         <span class="choice-text">Start a new design by typing in measurements, masses and launch conditions. No CAD needed.</span>
       </button>
     </div>
+    <p class="first-time">New here? <button class="btn small" id="try-example">Try an example design</button> to see how everything works with made-up numbers,
+      or read the <a href="#/help">quick guide</a>.</p>
 
     <div class="panel section">
       <div class="panel-head">
@@ -110,6 +136,12 @@ ${trashHTML()}
         <button class="btn" id="export-tests">Export tests (.csv)</button>
       </div>
     </div>`;
+
+  el.querySelector('#try-example').addEventListener('click', () => {
+    const d = createExampleDesign();
+    toast('Example design created — the numbers are made up, just for learning.');
+    app.go(`#/design/${d.id}/overview`);
+  });
 
   el.querySelectorAll('[data-start]').forEach((b) => b.addEventListener('click', () => {
     const d = createDesign();

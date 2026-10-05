@@ -1,4 +1,4 @@
-// Simulate tab: 3D view, animated trajectory (play/pause/restart/speed), graphs, results, explanation, limitations.
+// Fly it step: 3D view, animated trajectory (play/pause/restart/speed), graphs, results, explanation, limitations.
 import { TrajectoryView } from '../trajectory.js';
 import { lineChart } from '../charts.js';
 import { explain, sensitivity } from '../explain.js';

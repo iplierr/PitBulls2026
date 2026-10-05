@@ -1,4 +1,4 @@
-// "Get weather from NASA" panel on the Inputs tab.
+// "Get weather from NASA" panel on the Design numbers step.
 import { PRESETS, getWeather, pressureAtSite, compass } from '../nasa.js';
 import { touch } from '../store.js';
 import { esc, fmt, badge, toast } from '../ui.js';
@@ -115,7 +115,7 @@ function renderResult(root, ctx) {
         <td class="small">${isNum(w.heading) ? `Flight heading ${Math.round(w.heading)}°.` : 'Enter your flight heading to work this out:'} <input id="nasa-heading2" type="number" min="0" max="360" class="short" value="${isNum(w.heading) ? w.heading : ''}" placeholder="heading °"></td></tr>
       <tr><th>Air pressure</th><td class="num">${w.PS ? `${fmt(w.PS.median, 0)} hPa at NASA grid height` : '–'}</td>
         <td class="small muted">NASA's grid cell averages ${isNum(w.gridElevation) ? Math.round(w.gridElevation) : '?'} m above sea level.
-          ${pSite ? `At your site elevation (${siteEl} m): <strong>${fmt(pSite, 0)} hPa</strong> (standard-atmosphere correction).` : '<strong>Enter the site elevation</strong> (Inputs → Wind & air, Advanced) to correct pressure to your site — otherwise pressure is not applied.'}</td></tr>
+          ${pSite ? `At your site elevation (${siteEl} m): <strong>${fmt(pSite, 0)} hPa</strong> (standard-atmosphere correction).` : '<strong>Enter the site elevation</strong> (Design numbers → Wind & air, Advanced) to correct pressure to your site — otherwise pressure is not applied.'}</td></tr>
     </tbody></table>
     <div class="apply-box">
       <strong>Apply to Design ${esc(ctx.d.label)}:</strong>

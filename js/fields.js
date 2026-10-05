@@ -12,7 +12,7 @@ export const GROUPS = [
   { id: 'launch', tab: 'inputs', label: 'Launch' },
   { id: 'env', tab: 'inputs', label: 'Wind & air' },
   { id: 'aero', tab: 'inputs', label: 'Aerodynamics',
-    intro: 'These numbers describe how the wing turns speed into lift and drag. If you have no data yet, use the typical assumptions (they will be marked Estimated).' },
+    intro: 'These numbers describe how the wing turns speed into lift and drag. Don’t know them yet? That’s normal — click "Use typical value" (they will be marked Estimated).' },
   { id: 'rules', tab: 'inputs', label: 'Event rules (from your rulebook)' },
   { id: 'balance', tab: 'stability', label: 'Positions for balance' },
   { id: 'tail', tab: 'stability', label: 'Tail' },
@@ -43,7 +43,7 @@ export const FIELDS = [
   { id: 'pilotMass', group: 'mass', level: 'basic', label: 'Pilot mass', unit: 'kg', min: 1, max: 250, step: 1, example: '75',
     what: 'Pilot including helmet and gear.' },
   { id: 'craftMass', group: 'mass', level: 'basic', label: 'Craft mass (without pilot)', unit: 'kg', min: 0.1, max: 2000, step: 0.5, example: '60',
-    what: 'Leave blank to add up the parts in the Mass & balance tab automatically.' },
+    what: 'Leave blank to add up the parts in the Parts & balance tab automatically.' },
 
   // ---- Launch
   { id: 'launchSpeed', group: 'launch', level: 'basic', label: 'Speed leaving the deck', unit: 'm/s', min: 0, max: 60, step: 0.1, example: '6',
@@ -119,7 +119,7 @@ export const FIELDS = [
     what: 'How much of the free-stream airflow the tail feels (the wing slows and deflects air in front of it).',
     assume: { value: 0.9, note: 'Common textbook first estimate.' } },
 
-  // ---- Structure tab
+  // ---- Strength tab
   { id: 'loadFactor', group: 'load', level: 'basic', label: 'Design load factor', unit: 'g', min: 0.1, max: 20, step: 0.1, example: '2',
     what: 'How many times the craft\'s weight the wings must carry. 1 g = steady flight. You can copy the peak value from the simulation, but add your own margin.' },
   { id: 'sparCount', group: 'spar', level: 'basic', label: 'Number of main spars', unit: '', min: 1, max: 10, step: 1, example: '1',

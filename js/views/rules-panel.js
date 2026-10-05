@@ -11,7 +11,7 @@ export function rulesPanelHTML(d, ev, com) {
   const sel = d.ruleset || DEFAULT_RULESET;
   const picker = `<select id="ruleset-pick" aria-label="Event rules">
       ${Object.values(RULESETS).map((r) => `<option value="${r.id}" ${sel === r.id ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}
-      <option value="none" ${sel === 'none' ? 'selected' : ''}>No event rules (use the custom limits on the Inputs tab)</option>
+      <option value="none" ${sel === 'none' ? 'selected' : ''}>No event rules (use the custom limits on the Design numbers step)</option>
     </select>`;
   let rules = '';
   if (rs) {
@@ -53,7 +53,7 @@ export function rulesPanelHTML(d, ev, com) {
       </ul>
       <p class="hint">${rs.manual.filter(([id]) => done[id]).length} of ${rs.manual.length} confirmed. The event's Safety Team inspects every craft.</p>`;
   } else {
-    rules = '<p class="hint">No event rules selected. Custom limits can be entered on the Inputs tab (Event rules), and are checked under Problem checks.</p>';
+    rules = '<p class="hint">No event rules selected. Custom limits can be entered on the Design numbers step (Event rules), and are checked under Problem checks.</p>';
   }
 
   const fixes = engineeringFixes(d, ev, com);
@@ -67,7 +67,7 @@ export function rulesPanelHTML(d, ev, com) {
       <p class="hint">Suggestions worked out from your current inputs. They show what the numbers say — they don't guarantee a better flight.</p>
       ${fixes.length ? `<ul class="fix-list">${fixes.map((f) => `
         <li class="fix-${f.level}"><strong>${esc(f.title)}</strong><br>${esc(f.detail)}
-          ${f.tab ? `<button class="linkbtn" data-go-tab="${f.tab}">Open ${esc({ inputs: 'Inputs', mass: 'Mass & balance', whatif: 'What if?', structure: 'Structure', simulate: 'Simulate' }[f.tab] || f.tab)} →</button>` : ''}</li>`).join('')}</ul>`
+          ${f.tab ? `<button class="linkbtn" data-go-tab="${f.tab}">Open ${esc({ inputs: 'Design numbers', mass: 'Parts & balance', whatif: 'What if?', structure: 'Strength', simulate: 'Fly it' }[f.tab] || f.tab)} →</button>` : ''}</li>`).join('')}</ul>`
       : '<p class="muted">Nothing stands out with the information entered so far.</p>'}
     </div>`;
 }

@@ -16,6 +16,13 @@ You need [Node.js](https://nodejs.org). There's nothing to install.
 
 Double-clicking `index.html` won't work, because browsers block JavaScript modules on `file://` pages. The first load needs internet access for Three.js.
 
+## Easy to use
+
+- **New here?** On the Dashboard, click **Try an example design** to see everything working with clearly-labelled made-up numbers, or open **? Help** (quick guide, glossary, FAQ).
+- Each design follows numbered steps — **1 Design numbers → 2 3D model (optional) → 3 Parts & balance → 4 Fly it** — with ✓ / ! marks showing what's done. The **Summary** page always shows **Your next step**.
+- **Type in the units you know:** "28 ft", "8' 6\"", "400 lb", "15 mph", "77 F", "120 sqft", "35000 psi". Values are converted to metric automatically, and the other unit is shown under each box.
+- Rarely used buttons (Duplicate, Start over, Delete) are under **More ▾**.
+
 ## Where things are
 
 | Screen | What it's for |

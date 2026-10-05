@@ -65,7 +65,7 @@ export function ruleChecks(d, ev, com) {
   {
     const val = v.span;
     const c = { id: 'span', label: 'Wingspan (wing-tip to wing-tip)', limit: L.span, limitText: '28 ft (8.53 m)', value: val, unit: 'm', src: src.span, status: status(val, L.span), fixes: [] };
-    if (c.status === 'unknown') c.fixes.push('Enter the wingspan (Inputs tab) or measure it from CAD.');
+    if (c.status === 'unknown') c.fixes.push('Enter the wingspan (Design numbers step) or measure it from CAD.');
     if (c.status === 'over' || c.status === 'close') {
       const cut = val - L.span;
       if (c.status === 'over') c.fixes.push(`Reduce the span by at least ${f2(cut)} m (${ft(cut)} ft) to ${f2(L.span)} m or less.`);
@@ -82,12 +82,12 @@ export function ruleChecks(d, ev, com) {
   {
     const val = v.length;
     const c = { id: 'length', label: 'Length (nose to tail)', limit: L.length, limitText: '20 ft (6.10 m)', value: val, unit: 'm', src: src.length, status: status(val, L.length), fixes: [] };
-    if (c.status === 'unknown') c.fixes.push('Enter the overall length (Inputs → More details) or measure it from CAD.');
+    if (c.status === 'unknown') c.fixes.push('Enter the overall length (Design numbers → More details) or measure it from CAD.');
     if (c.status === 'over') {
       const cut = val - L.length;
       c.fixes.push(`Shorten the craft by at least ${f2(cut)} m (${ft(cut)} ft).`);
       if (isNum(v.tailLEx) && isNum(v.wingLEx)) {
-        c.fixes.push(`If you shorten the tail boom, the tail moves closer to the wing: its lever arm drops by up to ${f2(cut)} m, which reduces pitch stability. Re-check the static margin in Mass & balance — you may need a larger tail.`);
+        c.fixes.push(`If you shorten the tail boom, the tail moves closer to the wing: its lever arm drops by up to ${f2(cut)} m, which reduces pitch stability. Re-check the static margin in Parts & balance — you may need a larger tail.`);
       }
     }
     out.push(c);
@@ -96,14 +96,14 @@ export function ruleChecks(d, ev, com) {
   {
     const val = v.totalMass;
     const c = { id: 'mass', label: 'Craft + pilot mass', limit: L.totalMass, limitText: '400 lb (181.4 kg)', value: val, unit: 'kg', src: src.totalMass, status: status(val, L.totalMass), fixes: [] };
-    if (c.status === 'unknown') c.fixes.push('Enter the pilot mass and the craft mass (or list the parts in Mass & balance).');
+    if (c.status === 'unknown') c.fixes.push('Enter the pilot mass and the craft mass (or list the parts in Parts & balance).');
     if (c.status === 'over' || c.status === 'close') {
       const cut = val - L.totalMass;
       if (c.status === 'over') c.fixes.push(`Remove at least ${f2(cut)} kg (${(cut / LB).toFixed(1)} lb) — that is ${((cut / (v.craftMass || val)) * 100).toFixed(0)}% of the craft mass.`);
       const parts = d.components.filter((p) => isNum(componentMass(p))).sort((a, b) => componentMass(b) - componentMass(a)).slice(0, 3);
       if (parts.length) c.fixes.push(`Heaviest parts: ${parts.map((p) => `${p.name || 'unnamed'} ${componentMass(p).toFixed(1)} kg`).join(', ')}. Lightening these helps most.`);
       const pocketable = d.components.filter((p) => isNum(p.mass) && p.mass > 2 && pocketRemoval(p).none);
-      if (pocketable.length) c.fixes.push(`Consider pocketing lightly-loaded areas of heavy parts such as ${pocketable.slice(0, 3).map((p) => p.name || 'unnamed').join(', ')} (Mass & balance → Lightweighting) — for example webs and panels away from joints. Keep material around joints, fasteners and the spar.`);
+      if (pocketable.length) c.fixes.push(`Consider pocketing lightly-loaded areas of heavy parts such as ${pocketable.slice(0, 3).map((p) => p.name || 'unnamed').join(', ')} (Parts & balance → Lightweighting) — for example webs and panels away from joints. Keep material around joints, fasteners and the spar.`);
       c.fixes.push('The pilot counts toward the limit, so pilot choice also matters.');
     }
     out.push(c);
@@ -113,7 +113,7 @@ export function ruleChecks(d, ev, com) {
     const val = v.height;
     const c = { id: 'height', label: 'Height with pilot crouched', limit: L.crouchHeight, limitText: '10 ft (3.05 m)', value: val, unit: 'm', src: src.height, status: status(val, L.crouchHeight), fixes: [],
       note: 'Checked against the overall craft height you entered. The rule is measured with the pilot in a crouch, so include the pilot.' };
-    if (c.status === 'unknown') c.fixes.push('Enter the overall height with the pilot crouched (Inputs → More details).');
+    if (c.status === 'unknown') c.fixes.push('Enter the overall height with the pilot crouched (Design numbers → More details).');
     if (c.status === 'over') c.fixes.push(`Lower the craft by at least ${f2(val - L.crouchHeight)} m (${ft(val - L.crouchHeight)} ft) — e.g. mount the wing lower or reduce any tall decorations.`);
     out.push(c);
   }
@@ -129,7 +129,7 @@ export function engineeringFixes(d, ev, com) {
   const a = ev.analysis;
   const { v } = ev.r;
   if (!a) {
-    out.push({ level: 'warn', title: 'The simulation can\'t run yet', detail: `Missing: ${ev.missing.map((m) => m.label.toLowerCase()).join(', ')}. Fill these in first (Inputs tab).`, tab: 'inputs' });
+    out.push({ level: 'warn', title: 'The simulation can\'t run yet', detail: `Missing: ${ev.missing.map((m) => m.label.toLowerCase()).join(', ')}. Fill these in first (Design numbers step).`, tab: 'inputs' });
     return out;
   }
   const W = a.weightN;
@@ -173,7 +173,7 @@ export function engineeringFixes(d, ev, com) {
         + 'This is a preliminary estimate; it does not prove the craft will be stable.' });
   } else if (!isNum(sm.result)) {
     out.push({ level: 'info', title: 'Pitch balance not checked yet', tab: 'mass',
-      detail: 'Add part positions, the pilot position, the wing position and the tail size in Mass & balance to get a preliminary stability estimate. An unbalanced craft is one of the most common reasons Flugtag flights end quickly.' });
+      detail: 'Add part positions, the pilot position, the wing position and the tail size in Parts & balance to get a preliminary stability estimate. An unbalanced craft is one of the most common reasons Flugtag flights end quickly.' });
   }
 
   // Structure

@@ -7,6 +7,7 @@ import * as testsView from './views/tests.js';
 import * as compareView from './views/compare.js';
 import * as notebookView from './views/notebook.js';
 import * as reportView from './views/report.js';
+import * as helpView from './views/help.js';
 
 store.load();
 
@@ -35,6 +36,7 @@ const VIEWS = {
   compare: [compareView, 'view-compare'],
   notebook: [notebookView, 'view-notebook'],
   report: [reportView, 'view-report'],
+  help: [helpView, 'view-help'],
 };
 
 function route() {

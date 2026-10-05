@@ -1,4 +1,4 @@
-// Mass & balance tab: parts list, totals, mass distribution, centre of mass, preliminary pitch-stability check.
+// Parts & balance tab: parts list, totals, mass distribution, centre of mass, preliminary pitch-stability check.
 import { uid } from '../store.js';
 import { componentMass, partMassSource, pocketRemoval, pocketVolume, withoutPocketing, hasPocketing, evaluate, centerOfMass } from '../model.js';
 import { FIELD } from '../fields.js';
@@ -20,14 +20,14 @@ export function render(panel, ctx) {
         </div>
       </div>
       <p class="hint">List every part with its mass. Positions are measured <strong>from the nose</strong> (backwards) and <strong>from the lowest point</strong> (upwards), in metres.
-        Mark whether each mass was weighed, taken from a spec, or guessed — guesses make the totals <em>Estimated</em>. The pilot is entered on the Inputs tab (mass) and below (position).</p>
+        Mark whether each mass was weighed, taken from a spec, or guessed — guesses make the totals <em>Estimated</em>. The pilot is entered on the Design numbers step (mass) and below (position).</p>
       <div class="table-wrap"><table class="parts-table" id="parts-table"></table></div>
     </div>
     <div class="panel section">
       <h2>Lightweighting (pocketing) &amp; mass from CAD volume</h2>
       <p class="hint"><strong>Pocketing</strong> means cutting cavities or holes into a part to remove material that isn't carrying much load, making it lighter. There are two ways to include it:</p>
       <ol class="hint">
-        <li><strong>From CAD:</strong> model the pockets in CAD, upload the model, copy its parts here (CAD tab), enter each part's material density, and click
+        <li><strong>From CAD:</strong> model the pockets in CAD, upload the model, copy its parts here (3D model step), enter each part's material density, and click
           <em>Use as part mass</em>. A pocketed model has less volume, so it automatically weighs less. Save the un-pocketed and pocketed models as two design versions to compare them.</li>
         <li><strong>By hand:</strong> enter the part's mass <em>before</em> pocketing in the table above, then add its pockets below (how many × size × depth).
           The removed material is subtracted. If you weighed the part <em>after</em> pocketing, don't add pockets — they would be subtracted twice.</li>
@@ -122,7 +122,7 @@ function renderLW(panel, ctx) {
         <label>Material density <span class="unit">(kg/m³)</span><input data-lk="density" type="number" min="1" max="25000" step="any" value="${c.density ?? ''}" placeholder="from datasheet"></label>
         <div class="lw-cad">${vol !== null
           ? `CAD volume: <strong>${sig(vol, 4)} m³</strong> ${badge('measured')}<br><span class="lw-cadmass"></span>`
-          : '<span class="muted small">No CAD volume for this part (copy parts from the CAD tab; the part must be a closed shape).</span>'}</div>
+          : '<span class="muted small">No CAD volume for this part (copy parts from the 3D model step; the part must be a closed shape).</span>'}</div>
         <label>Or mass removed <span class="unit">(kg)</span><input data-lk="removedMass" type="number" min="0" step="any" value="${c.removedMass ?? ''}" placeholder="e.g. weighed offcuts"></label>
       </div>
       ${(c.pockets || []).length ? `<table class="pocket-table">
@@ -222,7 +222,7 @@ function updateLW(panel, ctx) {
     <td class="num">${isNum(a) && isNum(b) ? `${b - a >= 0 ? '+' : ''}${(b - a).toFixed(dg)} ${unit}` : '–'}</td></tr>`;
   out.innerHTML = `
     <h3>Effect of pocketing</h3>
-    ${typed ? '<div class="verdict warn">Craft mass is typed directly on the Inputs tab, so the simulation <strong>ignores the parts list and pocketing</strong>. Clear that field to use the parts total.</div>' : ''}
+    ${typed ? '<div class="verdict warn">Craft mass is typed directly on the Design numbers step, so the simulation <strong>ignores the parts list and pocketing</strong>. Clear that field to use the parts total.</div>' : ''}
     <table class="list-table"><thead><tr><th></th><th>Without pocketing</th><th>With pocketing</th><th>Change</th></tr></thead><tbody>
       ${row('Material removed', 0, removed, 'kg')}
       ${row('Total mass (craft + pilot)', ev0.r.v.totalMass, ev1.r.v.totalMass, 'kg')}
@@ -232,7 +232,7 @@ function updateLW(panel, ctx) {
       ${row('Stall speed', ev0.analysis?.stallSpeed, ev1.analysis?.stallSpeed, 'm/s')}
     </tbody></table>
     <p class="hint">Removed material is assumed to come from the part's listed position, so the centre of mass shifts only because of the mass change.
-      <strong>Pockets weaken parts.</strong> Pocketing isn't modelled in the Structure tab, and holes near highly stressed edges, joints or bolt holes can start cracks.
+      <strong>Pockets weaken parts.</strong> Pocketing isn't modelled in the Strength tab, and holes near highly stressed edges, joints or bolt holes can start cracks.
       Keep material where the loads go (flanges, around fasteners) and remove it from lightly loaded webs.</p>`;
 }
 
@@ -254,7 +254,7 @@ function renderTable(panel, ctx) {
   panel.querySelector('#parts-table').innerHTML = `
     <thead><tr><th>Name</th><th>Category</th><th>Mass each (kg)</th><th>Qty</th><th>Mass is</th><th>Material</th><th>Dimensions</th>
       <th title="Distance from the nose">From nose (m)</th><th title="Height above the lowest point">Height (m)</th><th>Notes</th><th></th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="11" class="muted">No parts yet. Add parts, or copy them from the CAD tab.</td></tr>'}</tbody>`;
+    <tbody>${rows || '<tr><td colspan="11" class="muted">No parts yet. Add parts, or copy them from the 3D model step.</td></tr>'}</tbody>`;
 }
 
 export function update(panel, ctx, skipId) {
@@ -284,7 +284,7 @@ export function update(panel, ctx, skipId) {
           <tr><th>Pilot</th><td class="num">${isNum(r.v.pilotMass) ? `${fmt(r.v.pilotMass, 1)} kg` : '–'}</td><td>${badge(r.src.pilotMass || 'missing')}</td></tr>
           <tr><th>Total (craft + pilot)</th><td class="num">${isNum(r.v.totalMass) ? `<strong>${fmt(r.v.totalMass, 1)} kg</strong>` : '–'}</td><td>${badge(r.src.totalMass || 'missing')}</td></tr>
         </tbody></table>
-        ${isNum(d.values.craftMass) && parts.length ? '<p class="hint">Craft mass is typed directly on the Inputs tab, so the parts total is <strong>not</strong> used by the simulation. Clear it there to use the parts total.</p>' : ''}
+        ${isNum(d.values.craftMass) && parts.length ? '<p class="hint">Craft mass is typed directly on the Design numbers step, so the parts total is <strong>not</strong> used by the simulation. Clear it there to use the parts total.</p>' : ''}
         ${d.components.some((c) => !isNum(componentMass(c))) ? `<p class="hint">${d.components.filter((c) => !isNum(componentMass(c))).length} part(s) have no mass yet and are not counted.</p>` : ''}
         ${top.length ? `<h3>Heaviest parts</h3><ol class="plain-list numbered">${top.map((c) => `<li>${esc(c.name || 'Unnamed')} — ${fmt(componentMass(c), 1)} kg (${fmt(componentMass(c) / sum * 100, 0)}% of parts) ${badge(partMassSource(c))}</li>`).join('')}</ol>` : ''}
       </div>
@@ -334,7 +334,7 @@ export function update(panel, ctx, skipId) {
 }
 
 function comHTML({ com, ev }) {
-  if (!com.items.length) return '<p class="muted">Add parts with masses (and the pilot mass on the Inputs tab) to calculate the centre of mass.</p>';
+  if (!com.items.length) return '<p class="muted">Add parts with masses (and the pilot mass on the Design numbers step) to calculate the centre of mass.</p>';
   const problems = [];
   if (com.missingX.length) problems.push(`positions (from nose) are missing for: <strong>${com.missingX.map(esc).join(', ')}</strong>${com.missingX.includes('Pilot') ? ' — enter the pilot position below' : ''}`);
   if (com.noMass.length) problems.push(`these parts have no mass and are ignored: ${com.noMass.map(esc).join(', ')}`);
@@ -348,7 +348,7 @@ function comHTML({ com, ev }) {
     </div>
     ${eq}
     <p class="hint">Uses ${com.items.length} items totalling ${fmt(com.mass, 1)} kg (parts + pilot). ${problems.length ? 'Note: ' + problems.join('; ') + '.' : ''}
-      ${com.partsIncomplete ? '<strong>Warning:</strong> the parts do not add up to the craft mass typed on the Inputs tab, so some mass is missing from this calculation.' : ''}
+      ${com.partsIncomplete ? '<strong>Warning:</strong> the parts do not add up to the craft mass typed on the Design numbers step, so some mass is missing from this calculation.' : ''}
       ${isNum(ev.r.v.wingLEx) && isNum(ev.r.v.chord) ? `The CoM is at <strong>${fmt((com.x - ev.r.v.wingLEx) / ev.r.v.chord * 100, 0)}%</strong> of the wing chord from its leading edge.` : ''}</p>`;
 }
 

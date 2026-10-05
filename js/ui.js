@@ -1,6 +1,7 @@
 // Shared UI helpers: escaping, number formatting, source badges, field forms, calculation cards, downloads.
 import { FIELD, GROUPS, LEVELS, groupFields } from './fields.js';
 import { SOURCE_LABEL } from './model.js';
+import { parseWithUnit, altUnitText, acceptsUnits, altUnitName } from './units.js';
 
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
@@ -82,14 +83,14 @@ export function calcCardHTML(c, { open = false } = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// Field forms (used on Inputs, Mass & balance and Structure tabs)
+// Field forms (used on Inputs, Parts & balance and Strength tabs)
 // ---------------------------------------------------------------------------
 export function fieldHTML(f) {
   const control = f.type === 'select'
     ? `<select id="f-${f.id}">${f.options.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('')}</select>`
     : f.type === 'text'
       ? `<input id="f-${f.id}" type="text" maxlength="120" placeholder="${f.example ? `e.g. ${esc(f.example)}` : ''}">`
-      : `<input id="f-${f.id}" type="number" inputmode="decimal" step="${f.step}" min="${f.min}" max="${f.max}" placeholder="${f.example ? `e.g. ${esc(f.example)}` : ''}">`;
+      : `<input id="f-${f.id}" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="${f.example ? `e.g. ${esc(f.example)}${f.unit ? ' ' + esc(f.unit) : ''}${acceptsUnits(f.unit) && altUnitName(f.unit) ? ` (or ${esc(altUnitName(f.unit))})` : ''}` : ''}">`;
   return `
     <div class="field" data-id="${f.id}">
       <div class="field-top">
@@ -101,10 +102,11 @@ export function fieldHTML(f) {
         <span class="src-badge"></span>
         <button type="button" class="reset" title="Clear (or return to the CAD-measured value)" aria-label="Reset ${esc(f.label)}">↺</button>
       </div>
+      <small class="conv-hint"></small>
       <small class="what">${esc(f.what)}</small>
       ${f.help ? `<div class="help-text" hidden>${esc(f.help)}</div>` : ''}
       <div class="derived-how"></div>
-      ${f.assume ? `<div class="assume"><button type="button" class="btn tiny assume-btn" data-assume="${f.id}">Use typical assumption: ${esc(f.assume.value)}${f.unit ? ' ' + esc(f.unit) : ''}</button> <small>${esc(f.assume.note)}</small></div>` : ''}
+      ${f.assume ? `<div class="assume"><button type="button" class="btn tiny assume-btn" data-assume="${f.id}">Use typical value: ${esc(f.assume.value)}${f.unit ? ' ' + esc(f.unit) : ''}</button> <small>${esc(f.assume.note)}</small></div>` : ''}
     </div>`;
 }
 
@@ -133,6 +135,8 @@ export function refreshFields(container, d, r, { level = 'advanced', requiredIds
       else input.value = '';
     }
     input.classList.toggle('derived', derived);
+    const hint = div.querySelector('.conv-hint');
+    if (hint && id !== skipId) hint.textContent = isNum(r.v[id]) && !f.type ? altUnitText(r.v[id], f.unit) : '';
     const src = hasStored ? (d.source[id] || 'entered') : derived ? r.src[id] : 'missing';
     div.querySelector('.src-badge').innerHTML = badge(src);
     div.querySelector('.reset').hidden = !hasStored;
@@ -166,14 +170,23 @@ export function bindFields(container, getDesign, onChange) {
       d.values[f.id] = raw;
       d.source[f.id] = 'entered';
     } else {
-      const v = parseFloat(raw);
-      if (!Number.isFinite(v) || v < f.min || v > f.max) invalid = true;
-      else { d.values[f.id] = v; d.source[f.id] = 'entered'; }
+      const p = parseWithUnit(raw, f.unit);
+      const v = p.value;
+      const hint = div.querySelector('.conv-hint');
+      if (p.error || !Number.isFinite(v) || v < f.min || v > f.max) {
+        invalid = true;
+        div.dataset.err = p.error || `Enter a value from ${f.min} to ${f.max}${f.unit ? ' ' + f.unit : ''}.`;
+        if (hint) hint.textContent = '';
+      } else {
+        d.values[f.id] = +v.toPrecision(6);
+        d.source[f.id] = 'entered';
+        if (hint) hint.textContent = p.converted ? `= ${+v.toPrecision(4)} ${f.unit} (converted from ${p.converted})` : altUnitText(v, f.unit);
+      }
     }
     if (d.sourceNote) delete d.sourceNote[f.id]; // typed over: no longer from that source
     div.classList.toggle('invalid', invalid);
     const what = div.querySelector('.what');
-    what.textContent = invalid ? `Enter a number from ${f.min} to ${f.max}${f.unit ? ' ' + f.unit : ''}. (Not saved until valid.)` : f.what;
+    what.textContent = invalid ? `${div.dataset.err || 'Check this value.'} (Not saved until it's valid.)` : f.what;
     what.classList.toggle('error-msg', invalid);
     if (!invalid) onChange(f.id);
   });

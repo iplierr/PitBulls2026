@@ -119,7 +119,7 @@ export function removeModelDialog(ctx) {
       <h2>Remove ${esc(d.cad.fileName)}?</h2>
       <p class="hint">The model moves to <strong>Model history</strong>, so you can switch back to it later. Undo (top of the page) also works.</p>
       <label class="check-row"><input type="checkbox" name="meas" ${measuredIds.length ? 'checked' : 'disabled'}> Also clear the ${measuredIds.length} value(s) it put into the design (fields marked Measured)</label>
-      <label class="check-row"><input type="checkbox" name="parts" ${cadParts.length ? '' : 'disabled'}> Also remove the ${cadParts.length} part(s) copied from it into Mass &amp; balance</label>
+      <label class="check-row"><input type="checkbox" name="parts" ${cadParts.length ? '' : 'disabled'}> Also remove the ${cadParts.length} part(s) copied from it into Parts &amp; balance</label>
       <div class="row-actions" style="margin-top:12px">
         <button class="btn primary" value="ok">Remove model</button>
         <button class="btn" value="cancel">Cancel</button>

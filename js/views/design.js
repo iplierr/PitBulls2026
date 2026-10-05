@@ -1,4 +1,4 @@
-// Design workspace: header, tabs, Overview and Inputs tabs. Other tabs live in their own modules.
+// Design workspace: header, tabs, Overview and Design numbers steps. Other tabs live in their own modules.
 import { db, getDesign, touch, newVersion, duplicateAsNew, designTitle, deleteDesign } from '../store.js';
 import * as history from '../history.js';
 import { FIELD, GROUPS, LEVELS, LEVEL_LABEL } from '../fields.js';
@@ -12,21 +12,23 @@ import * as whatifTab from './whatif-tab.js';
 import * as calcTab from './calc-tab.js';
 import { nasaPanelHTML, bindNasaPanel, refreshNasaPanel } from './nasa-panel.js';
 import { rulesPanelHTML, bindRulesPanel } from './rules-panel.js';
+import { ruleChecks } from '../rules.js';
 
 const overviewTab = { render: renderOverview, update: renderOverview };
 const inputsTab = { render: renderInputs, update: updateInputs };
 
+// Plain-language tab names. Steps 1–4 are the normal order; "More tools" are optional extras.
 const TABS = [
-  ['overview', 'Overview', overviewTab],
-  ['inputs', 'Inputs', inputsTab],
-  ['cad', 'CAD model', cadTab],
-  ['mass', 'Mass & balance', massTab],
-  ['simulate', 'Simulate', simTab],
-  ['whatif', 'What if?', whatifTab],
-  ['calcs', 'Calculations', calcTab.calcs],
-  ['structure', 'Structure', calcTab.structure],
+  ['overview', 'Summary', overviewTab, { home: true, desc: 'Your results, the Miami rules check, and what to do next.' }],
+  ['inputs', 'Design numbers', inputsTab, { step: 1, desc: 'Step 1 — type in the craft\'s size, weight and launch conditions. You can type feet and pounds (e.g. "28 ft", "400 lb").' }],
+  ['cad', '3D model', cadTab, { step: 2, desc: 'Step 2 (optional) — upload your CAD file (STL or GLB) to measure the craft automatically.' }],
+  ['mass', 'Parts & balance', massTab, { step: 3, desc: 'Step 3 — list the parts, their weights and positions to find the balance point (centre of mass).' }],
+  ['simulate', 'Fly it', simTab, { step: 4, desc: 'Step 4 — watch the estimated flight, with graphs and a plain-English explanation.' }],
+  ['whatif', 'What if?', whatifTab, { more: true, desc: 'Change one thing (weight, wingspan, launch speed…) and see how the flight changes.' }],
+  ['calcs', 'The math', calcTab.calcs, { more: true, desc: 'Every equation, its inputs and where each number came from.' }],
+  ['structure', 'Strength', calcTab.structure, { more: true, desc: 'Rough check of whether the wing spar is strong enough, and water-impact loads.' }],
 ];
-const TAB = Object.fromEntries(TABS.map(([id, label, mod]) => [id, { id, label, mod }]));
+const TAB = Object.fromEntries(TABS.map(([id, label, mod, meta]) => [id, { id, label, mod, ...meta }]));
 
 let S = null; // { el, app, d, tab, ev, com, pendingFocus }
 
@@ -116,21 +118,43 @@ function renderShell() {
       </div>
       <div class="design-status" id="design-status"></div>
       <div class="row-actions">
-        <button class="btn small" id="btn-version" title="Copy as the next version, e.g. 1 → 1.1">New version</button>
-        <button class="btn small" id="btn-dup">Duplicate</button>
-        <a class="btn small" href="#/report/${d.id}">Report / export</a>
-        <button class="btn small" id="btn-restart" title="Clear this design and start again (can be undone)">Start over…</button>
-        <button class="btn small danger" id="btn-delete" title="Move this design to Recently deleted">Delete</button>
+        <button class="btn small" id="btn-version" title="Save a copy as the next version (e.g. 1 → 1.1) before changing things, so you can compare">Save as new version</button>
+        <a class="btn small" href="#/report/${d.id}" title="Printable report, PDF and spreadsheet exports">Report</a>
+        <details class="menu">
+          <summary class="btn small">More ▾</summary>
+          <div class="menu-list">
+            <button type="button" id="btn-dup">Duplicate as a new design</button>
+            <button type="button" id="btn-restart">Start over… <small>(clear this design)</small></button>
+            <button type="button" id="btn-delete" class="danger">Delete design</button>
+          </div>
+        </details>
       </div>
     </div>
-    <div class="legend-inline">
-      ${badge('measured')} from CAD geometry ${badge('entered')} typed by you ${badge('calculated')} worked out from other values
-      ${badge('estimated')} assumption or uses one ${badge('missing')}
-    </div>
-    <nav class="tabs" role="tablist">
-      ${TABS.map(([id, label]) => `<a href="#/design/${d.id}/${id}" data-tab="${id}" role="tab">${label}</a>`).join('')}
+    ${d.example ? '<div class="verdict warn example-banner"><strong>Example design.</strong> These numbers are made up so you can see how the app works. Don\'t use its results for your craft — start your own design from the Dashboard.</div>' : ''}
+    <nav class="tabs steps" role="tablist" aria-label="Design steps">
+      ${TABS.filter(([, , , m]) => m.home).map(([id, label]) => `<a href="#/design/${d.id}/${id}" data-tab="${id}" role="tab" class="tab-home">⌂ ${label}</a>`).join('')}
+      <span class="tab-sep">Steps</span>
+      ${TABS.filter(([, , , m]) => m.step).map(([id, label, , m]) => `<a href="#/design/${d.id}/${id}" data-tab="${id}" role="tab"><span class="step-num">${m.step}</span>${label}<span class="step-st" data-st="${id}"></span></a>`).join('')}
+      <span class="tab-sep">More tools</span>
+      ${TABS.filter(([, , , m]) => m.more).map(([id, label]) => `<a href="#/design/${d.id}/${id}" data-tab="${id}" role="tab" class="tab-more">${label}</a>`).join('')}
     </nav>
+    <div class="tab-desc-row">
+      <p class="tab-desc" id="tab-desc"></p>
+      <details class="legend-help">
+        <summary>What do the coloured labels mean?</summary>
+        <ul>
+          <li>${badge('measured')} measured from your CAD model (or a part you weighed)</li>
+          <li>${badge('entered')} typed in by your team</li>
+          <li>${badge('calculated')} worked out from other numbers with an equation</li>
+          <li>${badge('estimated')} a guess or typical value — or worked out from one. Replace with real data when you can.</li>
+          <li>${badge('missing')} not filled in yet. The app never fills in blanks behind your back.</li>
+        </ul>
+      </details>
+    </div>
     <div class="tab-panel"></div>`;
+  // Close the More menu after choosing an item
+  const menu = S.el.querySelector('details.menu');
+  menu.querySelector('.menu-list').addEventListener('click', () => menu.removeAttribute('open'));
   S.el.querySelector('#design-name').addEventListener('input', (e) => {
     S.d.name = e.target.value;
     touch(S.d);
@@ -231,6 +255,22 @@ function startOver() {
 function updateHeader() {
   const u = S.el.querySelector('#btn-undo'), r = S.el.querySelector('#btn-redo');
   if (u) { u.disabled = !history.canUndo(S.d); r.disabled = !history.canRedo(S.d); }
+  // Step status marks: ✓ done, ! needs something, ○ optional
+  const st = {
+    inputs: S.ev.missing.length ? ['todo', '!', `${S.ev.missing.length} thing(s) still needed`] : ['done', '✓', 'Enough to run the simulation'],
+    cad: S.d.cad ? ['done', '✓', 'CAD model loaded'] : ['opt', '○', 'Optional'],
+    mass: Number.isFinite(S.com.x) ? ['done', '✓', 'Balance point calculated'] : ['todo', '!', 'Parts or positions still needed'],
+    simulate: S.ev.analysis ? ['done', '✓', 'Simulation ready'] : ['todo', '–', 'Needs step 1 first'],
+  };
+  S.el.querySelectorAll('[data-st]').forEach((el) => {
+    const [cls, icon, title] = st[el.dataset.st];
+    el.className = `step-st st-${cls}`;
+    el.textContent = icon;
+    el.title = title;
+    el.closest('a').title = title;
+  });
+  const desc = S.el.querySelector('#tab-desc');
+  if (desc && S.tab) desc.textContent = TAB[S.tab].desc;
   const a = S.ev.analysis;
   S.el.querySelector('#design-status').innerHTML = a
     ? `Estimate: <strong>${fmt(a.flight.distance)} m</strong> · ${fmt(a.flight.time, 2)} s ${badge(simulationSource(S.ev.r))}`
@@ -251,7 +291,7 @@ export function missingBlockHTML(ev) {
       </ul>
       ${assumable.length ? `
         <div class="assume-all">
-          <button class="btn small" data-assume-all="${assumable.join(',')}">Use typical assumptions for: ${assumable.map((id) => esc(FIELD[id].label)).join(', ')}</button>
+          <button class="btn small" data-assume-all="${assumable.join(',')}">Use typical values for: ${assumable.map((id) => esc(FIELD[id].label)).join(', ')}</button>
           <p class="hint">These will be marked <strong>Estimated</strong>, and every result that uses them will be marked Estimated too. Replace them with real data when you can.</p>
         </div>` : ''}
     </div>`;
@@ -264,7 +304,7 @@ export function bindMissingBlock(root) {
     const a = e.target.closest('[data-assume-all]');
     if (a) {
       applyAssumptions(S.d, a.dataset.assumeAll.split(','));
-      toast('Assumptions applied and marked Estimated.');
+      toast('Typical values filled in and marked Estimated.');
       ctx.changed(null);
     }
   });
@@ -276,6 +316,37 @@ export function bindMissingBlock(root) {
 const STATUS_ICON = { ok: '✓', est: '≈', missing: '⚠', optional: '○' };
 const STATUS_TEXT = { ok: 'available', est: 'uses estimates', missing: 'missing', optional: 'optional' };
 
+// The single most useful thing to do next, in plain words.
+function nextStep(d, ev, com, tests) {
+  if (ev.missing.length) {
+    const m = ev.missing[0];
+    const assumable = assumableMissing(ev.missing);
+    const onlyAssumable = ev.missing.every((x) => x.fieldIds.some((id) => assumable.includes(id)));
+    if (onlyAssumable) {
+      return { title: 'Almost there — a few aerodynamics or weather numbers are missing',
+        text: 'If you don\'t know them yet, use the typical values (they will be clearly marked Estimated). Then you\'ll see the flight.',
+        btn: `<button class="btn primary" data-assume-all="${assumable.join(',')}">Use typical values and show the flight</button>` };
+    }
+    return { title: `Fill in: ${m.label.toLowerCase()}${ev.missing.length > 1 ? ` (and ${ev.missing.length - 1} more)` : ''}`,
+      text: m.why, btn: `<button class="btn primary" data-goto-field="${m.fieldIds[0]}">Enter it →</button>` };
+  }
+  const over = ruleChecks(d, ev, com).filter((c) => c.status === 'over');
+  if (over.length) {
+    return { title: `Your design breaks a Miami rule: ${over.map((c) => c.label.toLowerCase()).join(', ')}`,
+      text: over[0].fixes[0] || 'See the rules check below for what to change.', btn: '<button class="btn primary" data-scroll="rules-panel">See the rules check ↓</button>' };
+  }
+  if (!Number.isFinite(com.x)) {
+    return { title: 'Find your balance point', text: 'List the parts with their weights and positions so the app can find the centre of mass — an unbalanced craft is a common reason flights end early.',
+      btn: '<button class="btn primary" data-go-tab="mass">Go to Parts &amp; balance →</button>' };
+  }
+  if (!tests.length) {
+    return { title: 'Watch the flight, then test for real', text: 'See the estimated flight, then record a real practice test so you can compare it with the simulation.',
+      btn: '<button class="btn primary" data-go-tab="simulate">Fly it →</button> <a class="btn" href="#/tests">Record a test</a>' };
+  }
+  return { title: 'Try an improvement', text: 'Use "What if?" to see which change helps the flight most, then save it as a new version so you can compare.',
+    btn: '<button class="btn primary" data-go-tab="whatif">What if? →</button>' };
+}
+
 function renderOverview(panel) {
   const { d, ev, com } = S;
   const tests = db.tests.filter((t) => t.designId === d.id);
@@ -284,7 +355,14 @@ function renderOverview(panel) {
   const a = ev.analysis;
   const firstBind = !panel.dataset.bound;
 
+  const next = nextStep(d, ev, com, tests);
   panel.innerHTML = `
+    <div class="next-step">
+      <div class="next-label">Your next step</div>
+      <div class="next-title">${esc(next.title)}</div>
+      <p>${esc(next.text)}</p>
+      <div class="row-actions">${next.btn}</div>
+    </div>
     <div class="two-col wide-left">
       <div>
         <div class="panel section">
@@ -296,8 +374,8 @@ function renderOverview(panel) {
               <div class="metric"><div class="label">Max height (above water)</div><div class="value">${fmt(a.flight.maxHeight)} <small>m</small></div></div>
               <div class="metric"><div class="label">Impact speed</div><div class="value">${fmt(a.flight.impactSpeed)} <small>m/s</small></div></div>
             </div>
-            <p class="hint">A simplified model — an estimate, not a prediction. See the Simulate tab for the flight path, graphs and an explanation.</p>
-            <button class="btn primary small" data-go-tab="simulate">Open simulation →</button>`
+            <p class="hint">A simplified model — an estimate, not a prediction. See the Fly it step for the flight path, graphs and an explanation.</p>
+            <button class="btn primary small" data-go-tab="simulate">Watch the flight →</button>`
           : missingBlockHTML(ev)}
         </div>
 
@@ -345,12 +423,14 @@ function renderOverview(panel) {
     panel.addEventListener('click', (e) => {
       const t = e.target.closest('[data-go-tab]');
       if (t) ctx.goTab(t.dataset.goTab);
+      const sc = e.target.closest('[data-scroll]');
+      if (sc) document.getElementById(sc.dataset.scroll)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
 }
 
 // ---------------------------------------------------------------------------
-// Inputs tab
+// Design numbers step
 // ---------------------------------------------------------------------------
 function renderInputs(panel) {
   const level = db.settings.level || 'basic';

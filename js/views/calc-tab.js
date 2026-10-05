@@ -1,4 +1,4 @@
-// Calculations tab (every equation with inputs and sources) and Structure tab (preliminary loads).
+// The math tab (every equation with inputs and sources) and Strength tab (preliminary loads).
 import { designCalcs, structureCalcs } from '../calcs.js';
 import { esc, fmt, calcCardHTML, groupsHTML, refreshFields, bindFields } from '../ui.js';
 
@@ -76,7 +76,7 @@ export const structure = {
       ? `<p class="hint">Peak load factor in the simulation: <strong>${fmt(f.peakLoadFactor, 2)} g</strong>.
           Real flights see extra loads from gusts, pitching and a rough launch, so teams usually design for more than this.
           <button type="button" class="btn tiny" id="use-peak">Use ${fmt(f.peakLoadFactor, 2)} g</button></p>`
-      : '<p class="hint">Run the simulation (Inputs tab) to see the peak load factor it predicts.</p>';
+      : '<p class="hint">Run the simulation (Design numbers step) to see the peak load factor it predicts.</p>';
     const cards = structureCalcs(ev.r, ev.analysis);
     const fos = cards.find((c) => c.id === 'fos');
     let summary;

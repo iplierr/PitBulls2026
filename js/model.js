@@ -87,7 +87,7 @@ export function resolve(d) {
   if (!has('craftMass') && parts.length) {
     const sum = parts.reduce((a, c) => a + componentMass(c), 0);
     const guessed = parts.some((c) => c.massSource === 'estimated' || (!pocketRemoval(c).none && c.densitySource === 'estimated')) ? ['estimated'] : [];
-    put('craftMass', sum, [], `Sum of ${parts.length} part${parts.length > 1 ? 's' : ''} in the Mass & balance tab.`, guessed);
+    put('craftMass', sum, [], `Sum of ${parts.length} part${parts.length > 1 ? 's' : ''} in the Parts & balance tab.`, guessed);
   }
   if (has('craftMass') && has('pilotMass')) {
     put('totalMass', v.craftMass + v.pilotMass, ['craftMass', 'pilotMass'], 'Craft mass + pilot mass.');
@@ -147,7 +147,7 @@ export function simulationMissing(r) {
 
   need('span', 'Wingspan sets the aspect ratio, which controls how efficiently the wing makes lift.');
   need('wingArea', 'Lift and drag both scale with wing area. Enter wing area, or wingspan and chord.', ['wingArea', 'chord']);
-  need('craftMass', 'Gravity pulls on the total mass. Enter it, or list parts in Mass & balance.');
+  need('craftMass', 'Gravity pulls on the total mass. Enter it, or list parts in Parts & balance.');
   need('pilotMass', 'The pilot is part of the total mass.');
   need('launchSpeed', 'The starting speed decides how much lift the wing can make at first.');
   need('deckHeight', 'The deck height is the height the craft falls from.');
@@ -268,7 +268,7 @@ export function sanityChecks(d, r, analysis) {
     if (!rem.none && isNum(c.mass) && rem.mass > c.mass) add('error', `Pockets on "${c.name || 'unnamed part'}" remove more mass (${rem.mass.toFixed(2)} kg) than the part has (${c.mass} kg). Check sizes and density.`);
   }
   const noMass = d.components.filter((c) => !isNum(componentMass(c)));
-  if (noMass.length) add('info', `${noMass.length} part(s) in Mass & balance have no mass yet: ${noMass.map((c) => c.name || 'unnamed').join(', ')}.`);
+  if (noMass.length) add('info', `${noMass.length} part(s) in Parts & balance have no mass yet: ${noMass.map((c) => c.name || 'unnamed').join(', ')}.`);
   if (has('ruleMaxSpan') && has('span') && v.span > v.ruleMaxSpan) add('error', `Wingspan ${v.span.toFixed(2)} m exceeds the rule limit you entered (${v.ruleMaxSpan} m).`, 'span');
   if (has('ruleMaxMass') && has('craftMass') && v.craftMass > v.ruleMaxMass) add('error', `Craft mass ${v.craftMass.toFixed(1)} kg exceeds the rule limit you entered (${v.ruleMaxMass} kg).`, 'craftMass');
   if (has('knownCL') && has('aoa')) add('info', 'A measured CL is entered, so the angle of attack is not used for lift.', 'aoa');

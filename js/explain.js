@@ -110,7 +110,7 @@ export function explain(ev, d, com, sens) {
   out.assumptions.push('2D model: only the head/tail part of the wind is used; crosswind, gusts and turning are ignored.');
   out.assumptions.push('No structural failure, wing flex, ground effect over the water, or ramp effects.');
 
-  if (!isNum(com.x)) out.missing.push('Centre of mass — needed to judge pitch balance. Add parts with positions in Mass & balance.');
+  if (!isNum(com.x)) out.missing.push('Centre of mass — needed to judge pitch balance. Add parts with positions in Parts & balance.');
   if (!isNum(r.v.tailArea)) out.missing.push('Tail size and position — needed for the preliminary stability check.');
   if (!isNum(r.v.knownCD) && r.src.cd0 === 'estimated') out.missing.push('Real drag data — CD0 is an assumption and strongly affects distance.');
   if (!isNum(r.v.knownCL) && r.src.clMax === 'estimated') out.missing.push('Real CLmax for your airfoil — decides when the wing stalls.');
